@@ -1,0 +1,17 @@
+@import url(https://fonts.googleapis.com/css?family=Lato);
+@import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+body {
+  font-family: 'Lato', sans-serif;
+}
+.remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+  
+img[alt=bash], img[alt=zsh], img[alt=zsh2] {
+  max-width: 75%;
+  height: auto;
+}
+
+img[alt=zsh2], img[alt=playlister] {
+  max-width: 100%;
+  height: auto;
+}

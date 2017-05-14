@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Command Line</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="stylesheets/application.css" />
+  </head>
+  <body>
+    <textarea id="source">
+
+      class: center, middle
+
+      # Command Line Interface
+      ---
+
+      # Agenda
+
+      1. Terminal
+      2. Bash Extras
+      3. Making a Bash Function
+      4. Bash Files
+
+      ---
+
+      # Terminal
+      - a means of interacting with a computer program where the user (or client) issues commands to the program in the form of successive lines of text (command lines). - Wikipedia
+
+      ---
+
+      class: center, middle
+      # Born-again shell (BASH)
+      ![bash](images/bash-terminal.png)
+      - Bash is an sh-compatible command language interpreter that executes commands read from the standard input or from a file
+
+      ---
+
+      class: center, middle
+      # Z shell (zsh)
+      ![zsh](images/zsh-terminal.png)
+
+      ---
+
+      # Why zsh?
+      - Zsh has command line editing, builtin spelling correction, programmable command completion, shell functions (with autoloading), a history mechanism, and a host of other features.
+
+      --
+
+      - tab completion!
+      - awesome plugins
+      ---
+
+      ![zsh2](images/zsh-terminal2.png)
+
+      ---
+
+      # Helpful Bash Commands
+      --
+
+      ```bash
+      $ cd -
+      ```
+      --
+      ```bash
+      $ git checkout -
+      ```
+      --
+      ```bash
+      $ ps
+      ```
+      --
+      ```bash
+      $ ps aux | grep <process>
+      ```
+
+      --
+      ```bash
+      $ tail -f log/development.log
+      ```
+      ---
+
+      # Other Goodies
+
+      --
+      - iTerm2
+
+      --
+      : terminal replacement
+
+      --
+        - split panes
+        - search
+
+      --
+      - ack
+      --
+      : like grep
+
+      --
+
+      - cURL, wget
+      --
+      : retrieve and render content from webservers
+
+      ---
+      # In the Wild
+      - https://github.com/geminisbs/tacc_epic/blob/master/lib/tasks/ta_plans.rake
+
+      --
+      ```ruby
+      task :uploads => :environment do
+            user_collection = UserCollection.find(119)
+
+            user_collection.ta_plans.each do |ta_plan|
+            if ta_plan.uploads.present?
+                ta_plan.uploads.each do |upload|
+                  puts "Upload #{upload.id}"
+                  filename = upload.key
+                  `curl -o uploads#{filename} #{upload.download_url}`
+                end
+              end
+            end
+      end
+      ```
+
+      --
+      - this is taking an s3 url and outputing the contents to uploads + filename
+      ---
+      # Working offline
+
+      ```bash
+      $ wget --recursive --no-clobber --page-requisites --html-extension --convert-links 
+      ```
+
+      ```bash
+      --restrict-file-names=windows https://howistart.org/posts/elixir/1
+      ```
+      ---
+
+      # Overview, Playlister App
+
+      ![playlister](images/playlister.png)
+      ---
+
+      # Bash Profile
+      ```bash
+      $ man bash
+      ```
+
+      --
+
+      - it first reads and executes commands from the file /etc/profile, if that file exists. After reading that file, it looks for ~/.bash_profile, ~/.bash_login, and ~/.profile, in that order...
+
+      --
+
+      ### basically
+
+      --
+
+      - .bash_profile on login
+
+      --
+
+      - .bashrc everytime a shell is started
+
+      ---
+      # Add an ENV Var
+
+      in .baschrc
+      ```bash
+      export S3KEY="<mys3key>"
+      ```
+
+      --
+      ```bash
+      $ echo $S3KEY
+      $ <mys3key>
+      ```
+      ---
+
+      # Bash Scripting
+
+      --
+      ## the fun stuff!
+
+      --
+      ### with youtube-dl
+      --
+      : a small command-line program to download videos from YouTube.com and other video sites
+
+      --
+      ```bash
+      $ brew install youtube-dl
+      ```
+      
+      ---
+
+      # Example function
+
+      put this in your .bash_profile
+      ```bash
+      function mp3 {
+        # Download all of the things to /Downloads/audio/
+
+        youtube-dl --default-search=ytsearch: \
+                   --restrict-filenames \
+                   --format=bestaudio \
+                   --audio-format=mp3 \
+                   --audio-quality=1 "$*" \
+                   --output="~/Downloads/audio/%(title)s.%(ext)s"
+      }
+      ```
+
+      --
+      and in a new terminal run:
+
+      --
+      ```bash
+      $ mp3 MNEK The Rhythm 
+      ```
+      ---
+
+      # Putting It All Together
+
+      ```bash
+      #!/bin/bash
+
+      echo "youtube-dl script started"
+
+      user_id=$1
+      shift
+
+      youtube-dl --default-search=ytsearch: \
+                 --restrict-filenames \
+                 --format=bestaudio \
+                 --audio-format=mp3 \
+                 --audio-quality=1 "$*" \
+                 --output="~/code/fun/playlister/tmp/$user_id/%(title)s.%(ext)s"
+
+      echo "youtube-dl complete"
+      ```
+
+      ---
+
+      ## Environment Variables and cURL
+
+      ```bash
+      #!/bin/bash
+
+      echo "s3 script started"
+
+      user_id=$1
+      directory=$2
+      file=$3
+      # extention=$4
+      bucket='playlister-meteor'
+      date=$(date +"%a, %d %b %Y %T %z")
+      acl="x-amz-acl:public-read"
+      content_type="video/mp4"
+      string="PUT\n\n$content_type\n$date\n$acl\n/$bucket/$user_id/$file"
+      signature=$(echo -en "${string}" | openssl sha1 -hmac "${S3SECRET}" -binary | base64)
+      curl -X PUT -T "/$directory" \
+        -H "Host: $bucket.s3.amazonaws.com" \
+        -H "Date: $date" \
+        -H "Content-Type: $content_type" \
+        -H "$acl" \
+        -H "Authorization: AWS ${S3KEY}:$signature" \
+        "https://$bucket.s3.amazonaws.com/$user_id/$file"
+
+      echo "s3 complete"
+      rm -rf "/${directory:?}"
+      ```
+
+    </textarea>
+    <script src="https://gnab.github.io/remark/downloads/remark-latest.min.js"></script>
+    <script>
+      var slideshow = remark.create();
+    </script>
+  </body>
+</html>
+
