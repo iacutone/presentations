@@ -1,12 +1,112 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Vim Presentation</title>
+    <title>Elm Presentation</title>
     <meta charset="utf-8">
     <link rel="stylesheet" href="stylesheets/application.css" />
   </head>
   <body>
     <textarea id="source">
+      class: center, middle
+
+      # Elm Lang
+      ---
+
+      # Agenda
+
+      1. Why Elm?
+      2. History
+      3. Pros/Cons
+      4. A Basic App
+      5. My Playlist App
+
+      ---
+      class: center, middle
+      # Why Elm?
+      "The practical result is that Elm code is fast, hard to break,
+      easily testable, and profoundly maintainable." -- [Why Elm](http://www.oreilly.com/web-platform/free/files/why-elm.pdf)
+      ---
+      class: center, middle
+
+      Thesis of Evan Czaplicki. [Link](https://www.seas.harvard.edu/sites/default/files/files/archived/Czaplicki.pdf).
+
+      ---
+      # Synopsis
+
+      Functional reactive programming is a declarative approach to GUI design.
+      The term declarative makes a distinction between the what and the how
+      of programming. A declarative language allows you to say what is displayed,
+      without having to specify exactly how the computer should do it.
+
+      ---
+
+      ![img](img/js.png)
+
+      --
+
+      To perform these tasks in a traditional GUI framework  such as JavaScript
+      would require signicantly more code: manually extracting the mouse
+      position from an event and describing exactly how to update the displayed
+      value. As a declarative framework, FRP makes this task considerably easier
+      by taking care of the how of events, display, and updates.
+      ---
+      # No more FRP
+
+      So is Elm about FRP anymore? No. Those days are over now. Elm is just a functional language that takes concurrency very seriously. And from a user's perspective, Elm is just a friendly functional language! [Source](http://elm-lang.org/blog/farewell-to-frp)
+      - Basically, Elm went from using signals (FRP) to commands and subscriptions
+      ---
+      class: center, middle
+      # Pros and Cons
+      ---
+      # Cons
+
+      --
+      * Takes a while to get used to the type system
+
+      --
+      * Takes a while to get used to the syntax
+
+      --
+      * Wrapping your head around things like generating a random number
+      ---
+      # Pros
+
+      --
+      * NO RUNTIME EXCEPTIONS
+
+      --
+      * Opinionated, follows the Elm Architecture pattern
+
+      --
+      * Amazing compiler error messages
+
+      --
+      * Elm debugger: https://pragmaticstudio.com/tutorials/elm-debugger
+
+      --
+      * Easy to understand what's going on
+
+      --
+      * Beginner friendly
+
+      ---
+      # Competition (more or less)
+      * Typescript
+      * Purescript
+      * Coffeescript
+      * Scala.js
+      ---
+
+      # A Basic Counter App
+
+      [See Gist](https://gist.github.com/iacutone/09e31217db8d5d253e1978cc8ad3600f)
+      [Online Compile Tool](http://elm-lang.org/try)
+      ---
+      class: center, middle
+      # My Playlist App
+
+      [Best Songs of 2016](http://best-of-playlist.s3-website.us-east-2.amazonaws.com/)
+      [GitHub Reop](https://github.com/iacutone/best-of-playlist)
     </textarea>
     <script src="https://gnab.github.io/remark/downloads/remark-latest.min.js"></script>
     <script>
