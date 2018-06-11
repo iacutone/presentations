@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Elm Presentation</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="stylesheets/application.css" />
+  </head>
+  <body>
+    <textarea id="source">
+      class: center, middle
+
+      # FxFA General Support
+
+      ---
+
+      # Agenda
+
+      1. GitHub Diff
+      1. Interactors FTW
+      1. Form Objects
+      1. Changesets
+      1. Heroku App
+
+      ---
+
+      [Github Repo](https://github.com/fracturedatlas/FundingWorks/pull/695/files)
+
+      - Commits: 104
+      - Files Changed: 56
+      - 1005 Additions
+      - 51 Deletions
+
+      ---
+      
+      # Interactors
+      - A way to pull business logic out of an `ActiveRecord` model
+
+      ---
+
+      ## An example object
+
+      ```ruby
+      module Staff
+        module Interactors
+          class GeneralSupport
+
+            attr_reader :fundraiser
+
+            def initialize(fundraiser)
+              @fundraiser = fundraiser
+            end
+
+            def self.approve(fundraiser)
+              new(fundraiser).approve
+            end
+
+            def approve
+              fundraiser.approved!
+              FundraiserMailer.gs_approved(fundraiser.id).deliver_now
+            end
+          end
+        end
+      end
+      ```
+      ---
+
+      # Form Objects
+      - A way to pull validations out of `ActiveRecord` models
+
+      ---
+
+      ```ruby
+      module Admin
+        class GeneralSupportForm
+          include ActiveModel::Model
+
+          attr_reader :fundraiser, :params
+
+          def self.attr_list
+            [:ask, :headline]
+          end
+
+          attr_accessor(*attr_list)
+
+          validates :headline, length: { maximum: 140, allow_blank: true }
+          validates :ask, length: { maximum: 500, allow_blank: true }
+
+          def initialize(params, fundraiser)
+            hash = ActiveSupport::HashWithIndifferentAccess.new(params.to_h)
+
+            @params = hash
+            super @params
+            @fundraiser = fundraiser
+          end
+
+          def submit
+          end
+        end
+      end
+      ```
+
+      ---
+      # Interactors | Form Objects Recap
+
+      - I call both objects from controllers
+      - Use interactors when updating a single attribute
+        - Maybe do something else (send an email)
+      - Use form objects when sending form params
+      - This is debatable.
+      ---
+
+      # Changesets
+      - A way to track model attribute updates
+
+      ```ruby
+      class Changeset < ApplicationRecord
+        belongs_to :trackable, polymorphic: true
+      end
+      ```
+
+      ```ruby
+      create_table "changesets", id: :serial, force: :cascade do |t|
+        t.string "trackable_id"
+        t.json "details"
+        t.string "trackable_type"
+      end
+      ```
+
+      ---
+      # A 'Trackable' Object
+
+      ```ruby
+      class Fundraiser < ApplicationRecord
+        has_many :changesets, as: :trackable, dependent: :destroy
+        belongs_to :active_changeset, class_name: 'Changeset', inverse_of: :trackable, optional: true
+      end
+      ```
+
+      ---
+
+      class: center, middle
+
+      [Changesets in Action](https://fa-fundraising-pr-695.herokuapp.com/admin/fundraisers/culture-project/general_support/details/edit)
+
+      ---
+
+      class: center, middle
+
+      # Fin
+
+    </textarea>
+    <script src="https://gnab.github.io/remark/downloads/remark-latest.min.js"></script>
+    <script>
+      remark.create();
+    </script>
+  </body>
+</html>
