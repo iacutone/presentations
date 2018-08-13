@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Postgres JSON</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="stylesheets/style.css" />
+  </head>
+  <body>
+    <textarea id="source">
+      class: center, middle
+
+      # FxFA General Support Refactor
+
+      ---
+
+      # Agenda
+
+      1. What Happened?
+      --
+
+      1. Old Code
+      --
+
+      1. New Code
+
+      ---
+
+
+      # What Happened?
+
+      - Changeset `ActiveRecord` model
+
+
+      ```ruby
+      class Changeset < ApplicationRecord
+        # pre-change code
+        belongs_to :campaign, inverse_of: :changesets
+        has_one :active_campaign, class_name: 'Campaign', inverse_of: :active_changeset
+
+        # post-change code
+        belongs_to :trackable, polymorphic: true
+      end
+      ```
+
+      ---
+
+      # The Change
+
+      ```ruby
+      class Fundraiser < ApplicationRecord
+        has_many :changesets, as: :trackable, dependent: :destroy
+        belongs_to :active_changeset, class_name: 'Changeset', inverse_of: :trackable, optional: true
+      end
+      ```
+
+      --
+      - adding _specific_ `ActiveRecord` attributes is __not__ possible with this change
+      
+      ---
+
+      # The Problem Exemplified
+      --
+      
+      - Tracking specific attribute changes from the `Fundraiser` model
+
+      ```ruby
+      class Fundraiser < ApplicationRecord
+        def changes_pending_review?
+          return false if changesets.none?
+
+          active_changeset_id != changesets.last.id
+        end
+      end
+      ```
+      
+      --
+      1. A form to update `Fundraiser` :ask and :headline attributes
+      2. A form to update `Fundraiser` :website, :twitter... attributes
+      --
+
+      - Both forms rely on `changes_pending_review?` to apply the changes
+
+      ---
+      class: center, middle
+
+              # ◉ ︵ ◉
+      ---
+
+      # The Solution
+      --
+
+      - delegate responsibility to attributes on the `Fundraiser` model
+
+      ```ruby
+      class Fundraiser < ApplicationRecord
+        def profile_has_pending_changes?
+          pending_profile_fields.present?
+        end
+
+        def has_pending_gs_changes?
+          pending_gs_fields.present?
+        end
+      end
+      ```
+
+      --
+
+      - These new column are type `json`
+
+      ---
+
+      # Updating Data
+
+      ```ruby
+       def update_ask
+         fundraiser.update!(ask: pending_gs_fields[:ask])
+       end
+       ```       
+
+      ---
+
+      ## PostgreSQL Json Attributes 
+      - [link](https://www.postgresql.org/docs/9.4/static/datatype-json.html)
+
+      --
+
+      | JSON primitive type | PostgreSQL type |
+      | ------------------- | --------------- |
+      | string              | text            |
+      | number              | numeric         |
+      | boolean             | boolean         |
+      | null                | (none)          |
+
+      ---
+
+      class: center, middle
+
+      # Fin
+
+    </textarea>
+    <script src="https://gnab.github.io/remark/downloads/remark-latest.min.js"></script>
+    <script>
+      remark.create();
+    </script>
+  </body>
+</html>
