@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Developing a Deep Work Routine</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="stylesheets/style.css" />
+  </head>
+  <body>
+    <textarea id="source">
+      class: center, middle
+
+      # Developing a Deep Work Routine
+
+      ---
+
+      # Agenda
+
+      1. Background
+      --
+
+      1. Pro/Con of using Elm, other relevant choices
+      --
+
+      1. Demo
+      --
+
+      1. Template for Success
+      --
+
+      1. Next Steps
+
+      ???
+      We hope folks learn about integrating our deep work approach into their schedules
+
+      ---
+      class: center, middle
+
+      ## Building Our App
+
+      ???
+      - Why Elm?
+      - Eric's 2017 Show + Tell about Elm & impact (ie, it's why we have Elm in production now)
+      - GraphQL (Angelique)
+      - Angelique's 2017 Show + Tell about GraphQL
+      - OKRs -- require quantifiable results and that wasn't easily accessible for all
+      ---
+
+      ### Pro/Con of using Elm
+      - Functional programming; errything is data here
+      - No run-time errors. Big flashing letters here.
+      - Elm nudges your design decisions for data manipulation; this leads to devs resolving so much before the code compiles or is in the browser
+      - Amazingly better UX here
+      - Question to resolve: Typed & Compiled CSS:  What does it catch/make us aware of vs existing precompilers (SCSS)?
+      - Not all "modern" bits are readily available:  packages for better accessibility coverage, no CSS grid in `elm-css`
+      - Good to explore this in a small app; not making decisions that affect a whole codebase
+      - Parsing JSON (which is what we got back from GH) in a statically typed language is a process; lots of steps; lots of being very specific
+
+      ---
+
+      ### Demo
+
+      [link to app](...)
+
+      ???
+      - Hosted in a AWS S3 bucket
+      - no back end!
+      ---
+
+      background-image: url(imgs/road.jpeg)
+      class: center, middle
+      ## Template for Success :crown: []
+
+      ---
+
+      background-image: url(imgs/road2.jpeg)
+      class: center, middle
+      ## Break It Down
+
+      ???
+      - MVP; small incremental goals; what can we get done in 60-90m?
+      - Small steps; investigative development process to see what was returned in query, what was displayed by our app
+      - Every meeting about achieving a specific goal
+
+      ---
+
+      background-image: url(imgs/buddy.jpeg)
+      class: center, middle
+      ## Take A Buddy
+
+      ???
+      - Get yourself a buddy; helps with accountability and knowledge building; asking questions together; getting at the why (and, admittedly, stumbling around together in the weeds at times)
+
+      ---
+
+      background-image: url(imgs/schedule.jpeg)
+      class: center, middle
+      ## Commit
+
+      ???
+      - Google Calendar == Commitment & public
+      - Make it part of _your_ OKRs
+      ---
+
+      - GIF of network tab results
+
+      ## What's Next
+      https://fractured-atlas.slack.com/files/UA7JZLWCD/FBLQTNZ8E/GH_App__TODO
+
+    </textarea>
+    <script src="https://gnab.github.io/remark/downloads/remark-latest.min.js"></script>
+    <script>
+      remark.create();
+    </script>
+  </body>
+</html>
