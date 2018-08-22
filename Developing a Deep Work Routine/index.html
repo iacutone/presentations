@@ -45,25 +45,65 @@
       - OKRs -- require quantifiable results and that wasn't easily accessible for all
       ---
 
-      ### Pro/Con of using Elm
-      - Functional programming; errything is data here
-      - No run-time errors. Big flashing letters here.
-      - Elm nudges your design decisions for data manipulation; this leads to devs resolving so much before the code compiles or is in the browser
-      - Amazingly better UX here
-      - Question to resolve: Typed & Compiled CSS:  What does it catch/make us aware of vs existing precompilers (SCSS)?
-      - Not all "modern" bits are readily available:  packages for better accessibility coverage, no CSS grid in `elm-css`
-      - Good to explore this in a small app; not making decisions that affect a whole codebase
-      - Parsing JSON (which is what we got back from GH) in a statically typed language is a process; lots of steps; lots of being very specific
+      ### Pros of using Elm
+      - Functional programming
+        - help think about small functions with _no_ side effects or object mutation
+      ---
 
+      class: center, middle
+      background-image: url(imgs/error.webp)
+      ### No run-time errors
+      ---
+      class: center, middle
+      background-image: url(imgs/elm-runtime.png)
+      ---
+      class: center, middle
+      background-image: url(imgs/elm\ errors.png)
+      ---
+      ### Cons of using Elm
+      - Parsing JSON
+
+      ```haskell
+
+      decodeOrganization =
+          decode Organization
+              |> requiredAt [ "data", "organization", "team", "members", "edges" ] (Json.Decode.list decodeUsers)
+
+
+      decodeUsers =
+          decode Users
+              |> required "node" decodeUser
+
+      decodeUser =
+          decode User
+              |> required "id" string
+              |> required "login" string
+      ```
+
+      ???
+      - parsing data in a statically typed language 
+
+      ---
+      ### Parsing the response in Ruby
+
+      ```ruby
+        json = JSON.parse(response)
+        data = {}
+        json['data']['organization']['team']['members']['edges'].each do |node|
+          data[node['id']] = node['login']
+        end
+        data
+      ```
       ---
 
       ### Demo
 
-      [link to app](...)
+      [link to app](localhost:8000)
 
       ???
       - Hosted in a AWS S3 bucket
       - no back end!
+      - inspect Network tab on Chrome
       ---
 
       background-image: url(imgs/road.jpeg)
@@ -100,8 +140,6 @@
       - Google Calendar == Commitment & public
       - Make it part of _your_ OKRs
       ---
-
-      - GIF of network tab results
 
       ## What's Next
       https://fractured-atlas.slack.com/files/UA7JZLWCD/FBLQTNZ8E/GH_App__TODO
