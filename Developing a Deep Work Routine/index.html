@@ -10,9 +10,12 @@
 <body>
   <textarea id="source">
       background-image: url(imgs/bkgd-aurora.jpg)
-      class: center, middle
+      class: center, middle, h-light, orig-padding
 
-      # Developing a Deep Work Routine
+      .darken[
+        ## Developing a
+        # DEEP WORK ROUTINE
+      ]
 
       ---
 
@@ -39,7 +42,7 @@
 
       class: center, middle
 
-      ## Background
+      # Background
       ![presentations](imgs/presentations.png)
 
       ???
@@ -50,31 +53,34 @@
       
       ---
 
-      ### Pros of using Elm
+      class: middle
+
+      # Pros of using Elm
       - Functional programming
         - help think about small functions with _no_ side effects or object mutation
       
       ---
 
-      class: center, middle 
-      background-image: url(imgs/error.webp)
+      class: center, middle
             
-      ### No run-time errors
+      ## No run-time errors
+      ![error](imgs/error.webp)
 
       ---
 
       background-image: url(imgs/elm-runtime.png)
       class: center, middle
+      
  
       ---
  
-      background-image: url(imgs/elm\ errors.png)
-      class: center, middle
+      background-image: url(imgs/elm-errors.png)
+      class: center, middle, bkgd-contain
  
       ---
 
-      ### Cons of using Elm
-      - Parsing JSON
+      ## Cons of using Elm
+      ### Parsing JSON
 
       ```haskell
 
@@ -98,7 +104,9 @@
 
       ---
 
-      ### Parsing the response in Ruby
+      class: middle
+
+      ### _vs_ parsing the response in Ruby
 
       ```ruby
         json = JSON.parse(response)
@@ -111,10 +119,9 @@
 
       ---
 
-      ### Demo
+      # Demo
 
-      [link to app](localhost:8000)
-      ![github.elm](imgs/scroll.gif)
+      [![local app](imgs/scroll.gif)](localhost:8000)
 
 
       ???
@@ -125,16 +132,22 @@
       ---
 
       background-image: url(imgs/road.jpeg)
-      class: center, middle
+      class: center, middle, h-light
 
-      ## Template for Success :crown: []
+      .darken[
+        # Template for Success 👑
+      ]
+
 
       ---
 
       background-image: url(imgs/road2.jpeg)
       class: center, middle
 
-      ## Break It Down
+      .lighten[
+        ## Break It Down
+      ]
+
 
       ???
       - MVP; small incremental goals; what can we get done in 60-90m?
@@ -144,9 +157,11 @@
       ---
 
       background-image: url(imgs/buddy.jpeg)
-      class: center, middle
+      class: center, bottom, bkgd-cover, h-light
 
-      ## Take A Buddy
+      .darken[
+        ## Take A Buddy
+      ]
 
       ???
       - Get yourself a buddy; helps with accountability and knowledge building; asking questions together; getting at the why (and, admittedly, stumbling around together in the weeds at times)
@@ -164,8 +179,14 @@
 
       ---
 
-      ## What's Next
-      https://fractured-atlas.slack.com/files/UA7JZLWCD/FBLQTNZ8E/GH_App__TODO
+      background-image: url(imgs/todo.jpeg)
+      class: center, middle, bkgd-cover
+
+      .lighten[
+        # What's Next
+        .no-decor.x-large[[🔍](https://fractured-atlas.slack.com/files/UA7JZLWCD/FBLQTNZ8E/GH_App__TODO)]
+      ]
+
 
     </textarea>
   <script src="https://gnab.github.io/remark/downloads/remark-latest.min.js"></script>
