@@ -9,6 +9,7 @@
 
 <body>
   <textarea id="source">
+
       background-image: url(imgs/bkgd-aurora.jpg)
       class: center, middle, h-light, orig-padding
 
@@ -36,7 +37,7 @@
       1. Next Steps
 
       ???
-      We hope folks learn about integrating our deep work approach into their schedules
+      We expect at least a few members of the team know we've been working on an internal tool built in Elm. Today, we'd like to share a bit about why we built the tool, how we built it -- both in terms of code and process -- and demo the tool for you. Most importantly, we hope folks learn about integrating our deep work approach into their schedules.
 
       ---
 
@@ -46,10 +47,10 @@
       ![presentations](imgs/presentations.png)
 
       ???
-      - Why Elm?
-      - Eric's May 2017 Show + Tell about Elm & impact (ie, it's why we have Elm in production now)
-      - Angelique's Dec 2017 Show + Tell about GraphQL
-      - OKRs -- require quantifiable results and that wasn't easily accessible for all
+      - The app we've built and this presentation is actually the child of two previous Show + Tell presentations:
+        - Eric's May 2017 talk about Elm (which is pretty much why we have Elm in production now)
+      - Angelique's Dec 2017 talk about how she used GitHub's GraphQL explorer for her self assessment
+      - The app itself was also motivated by OKRs, as both Eric and Jamie included in their OKRs goals about decreasing the LoC and reducing the lifetime of PRs; neither of these data points was easily accessible for all
       
       ---
 
@@ -71,11 +72,13 @@
       background-image: url(imgs/elm-runtime.png)
       class: center, middle
       
- 
       ---
  
       background-image: url(imgs/elm-errors.png)
       class: center, middle, bkgd-contain
+
+      ???
+      - Elm errors are friendly, helpful and great UX
  
       ---
 
@@ -138,6 +141,8 @@
         # Template for Success 👑
       ]
 
+      ???
+      We've shown you what we've built and talked about the choices we made along the way, now we want to focus on how we did this thing and, hopefully, inspire you to do the same.
 
       ---
 
@@ -148,10 +153,14 @@
         ## Break It Down
       ]
 
-
       ???
-      - MVP; small incremental goals; what can we get done in 60-90m?
-      - Small steps; investigative development process to see what was returned in query, what was displayed by our app
+      - Figure out your MVP and determine some incremental goals to get you there
+       - Specifically, what can we get done in 60-90m?
+       - To start, get an Elm app building and getting a response from GH
+         - First we saw the response in the Network tab
+         - Then we got it (wholesale, no parsing) to display in the browser window
+         - Then we got one bit of it (team usernames) to display in a list
+      - An investigative development process to see what was returned in query, what was displayed by our app
       - Every meeting about achieving a specific goal
 
       ---
@@ -164,7 +173,9 @@
       ]
 
       ???
-      - Get yourself a buddy; helps with accountability and knowledge building; asking questions together; getting at the why (and, admittedly, stumbling around together in the weeds at times)
+      - Get yourself a buddy; helps with accountability and knowledge building
+      - Asking questions together; getting at the why (and, admittedly, stumbling around together in the weeds at times)
+      - Another set of eyes on the code makes troubleshooting faster
 
       ---
 
@@ -174,7 +185,8 @@
       ## Commit
 
       ???
-      - Google Calendar == Commitment & public
+      - Put a regular date on your Google Calendar
+        - Public commitment & consistency
       - Make it part of _your_ OKRs
 
       ---
@@ -185,8 +197,12 @@
       .lighten[
         # What's Next
         .no-decor.x-large[[🔍](https://fractured-atlas.slack.com/files/UA7JZLWCD/FBLQTNZ8E/GH_App__TODO)]
+        .no-decor.x-large[[🖊️](https://s.codepen.io/angeliquejw/debug/dac4d2b34c041bf309e51f9de55c2491)]
       ]
 
+      ???
+      - CodePen to show where we're going
+      - Slack note to keep track; both of us can edit it
 
     </textarea>
   <script src="https://gnab.github.io/remark/downloads/remark-latest.min.js"></script>
