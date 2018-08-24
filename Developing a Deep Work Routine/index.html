@@ -1,15 +1,22 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Developing a Deep Work Routine</title>
-    <meta charset="utf-8">
-    <link rel="stylesheet" href="stylesheets/style.css" />
-  </head>
-  <body>
-    <textarea id="source">
-      class: center, middle
 
-      # Developing a Deep Work Routine
+<head>
+  <title>Developing a Deep Work Routine</title>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="stylesheets/style.css" />
+</head>
+
+<body>
+  <textarea id="source">
+
+      background-image: url(imgs/bkgd-aurora.jpg)
+      class: center, middle, h-light, orig-padding
+
+      .darken[
+        ## Developing a
+        # DEEP WORK ROUTINE
+      ]
 
       ---
 
@@ -18,7 +25,7 @@
       1. Background
       --
 
-      1. Pro/Con of using Elm
+      1. Pros & cons of using Elm
       --
 
       1. Demo
@@ -30,38 +37,53 @@
       1. Next Steps
 
       ???
-      We hope folks learn about integrating our deep work approach into their schedules
+      We expect at least a few members of the team know we've been working on an internal tool built in Elm. Today, we'd like to share a bit about why we built the tool, how we built it -- both in terms of code and process -- and demo the tool for you. Most importantly, we hope folks learn about integrating our deep work approach into their schedules.
 
       ---
+
       class: center, middle
 
-      ## Building Our App
+      # Background
+      ![presentations](imgs/presentations.png)
 
       ???
-      - Why Elm?
-      - Eric's 2017 Show + Tell about Elm & impact (ie, it's why we have Elm in production now)
-      - GraphQL (Angelique)
-      - Angelique's 2017 Show + Tell about GraphQL
-      - OKRs -- require quantifiable results and that wasn't easily accessible for all
+      - The app we've built and this presentation is actually the child of two previous Show + Tell presentations:
+        - Eric's May 2017 talk about Elm (which is pretty much why we have Elm in production now)
+      - Angelique's Dec 2017 talk about how she used GitHub's GraphQL explorer for her self assessment
+      - The app itself was also motivated by OKRs, as both Eric and Jamie included in their OKRs goals about decreasing the LoC and reducing the lifetime of PRs; neither of these data points was easily accessible for all
+      
       ---
 
-      ### Pros of using Elm
+      class: middle
+
+      # Pros of using Elm
       - Functional programming
         - help think about small functions with _no_ side effects or object mutation
+      
       ---
 
       class: center, middle
-      background-image: url(imgs/error.webp)
-      ### No run-time errors
+            
+      ## No run-time errors
+      ![error](imgs/error.webp)
+
       ---
-      class: center, middle
+
       background-image: url(imgs/elm-runtime.png)
-      ---
       class: center, middle
-      background-image: url(imgs/elm\ errors.png)
+      
       ---
-      ### Cons of using Elm
-      - Parsing JSON
+ 
+      background-image: url(imgs/elm-errors.png)
+      class: center, middle, bkgd-contain
+
+      ???
+      - Elm errors are friendly, helpful and great UX
+ 
+      ---
+
+      ## Cons of using Elm
+      ### Parsing JSON
 
       ```haskell
 
@@ -84,7 +106,10 @@
       - parsing data in a statically typed language 
 
       ---
-      ### Parsing the response in Ruby
+
+      class: middle
+
+      ### _vs_ parsing the response in Ruby
 
       ```ruby
         json = JSON.parse(response)
@@ -94,60 +119,97 @@
         end
         data
       ```
+
       ---
 
-      ### Demo
+      # Demo
 
-      [link to app](localhost:8000)
+      [![local app](imgs/scroll.gif)](localhost:8000)
+
 
       ???
       - Hosted in a AWS S3 bucket
       - no back end!
       - inspect Network tab on Chrome
+
       ---
 
       background-image: url(imgs/road.jpeg)
-      class: center, middle
-      ## Template for Success :crown: []
+      class: center, middle, h-light
+
+      .darken[
+        # Template for Success 👑
+      ]
+
+      ???
+      We've shown you what we've built and talked about the choices we made along the way, now we want to focus on how we did this thing and, hopefully, inspire you to do the same.
 
       ---
 
       background-image: url(imgs/road2.jpeg)
       class: center, middle
-      ## Break It Down
+
+      .lighten[
+        ## Break It Down
+      ]
 
       ???
-      - MVP; small incremental goals; what can we get done in 60-90m?
-      - Small steps; investigative development process to see what was returned in query, what was displayed by our app
+      - Figure out your MVP and determine some incremental goals to get you there
+       - Specifically, what can we get done in 60-90m?
+       - To start, get an Elm app building and getting a response from GH
+         - First we saw the response in the Network tab
+         - Then we got it (wholesale, no parsing) to display in the browser window
+         - Then we got one bit of it (team usernames) to display in a list
+      - An investigative development process to see what was returned in query, what was displayed by our app
       - Every meeting about achieving a specific goal
 
       ---
 
       background-image: url(imgs/buddy.jpeg)
-      class: center, middle
-      ## Take A Buddy
+      class: center, bottom, bkgd-cover, h-light
+
+      .darken[
+        ## Take A Buddy
+      ]
 
       ???
-      - Get yourself a buddy; helps with accountability and knowledge building; asking questions together; getting at the why (and, admittedly, stumbling around together in the weeds at times)
+      - Get yourself a buddy; helps with accountability and knowledge building
+      - Asking questions together; getting at the why (and, admittedly, stumbling around together in the weeds at times)
+      - Another set of eyes on the code makes troubleshooting faster
 
       ---
 
       background-image: url(imgs/schedule.jpeg)
       class: center, middle
+
       ## Commit
 
       ???
-      - Google Calendar == Commitment & public
+      - Put a regular date on your Google Calendar
+        - Public commitment & consistency
       - Make it part of _your_ OKRs
+
       ---
 
-      ## What's Next
-      https://fractured-atlas.slack.com/files/UA7JZLWCD/FBLQTNZ8E/GH_App__TODO
+      background-image: url(imgs/todo.jpeg)
+      class: center, middle, bkgd-cover
+
+      .lighten[
+        # What's Next
+        .no-decor.x-large[[🔍](https://fractured-atlas.slack.com/files/UA7JZLWCD/FBLQTNZ8E/GH_App__TODO)]
+        .no-decor.x-large[[🖊️](https://s.codepen.io/angeliquejw/debug/dac4d2b34c041bf309e51f9de55c2491)]
+      ]
+
+      ???
+      - CodePen to show where we're going
+      - Slack note to keep track; both of us can edit it
 
     </textarea>
-    <script src="https://gnab.github.io/remark/downloads/remark-latest.min.js"></script>
-    <script>
-      remark.create();
-    </script>
-  </body>
+  <script src="https://gnab.github.io/remark/downloads/remark-latest.min.js"></script>
+  <script>
+    remark.create();
+
+  </script>
+</body>
+
 </html>
