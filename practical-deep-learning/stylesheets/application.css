@@ -1,0 +1,25 @@
+@import url(https://fonts.googleapis.com/css?family=Hind);
+
+body {
+  font-family: 'Hind', sans-serif;
+  color: hsl(0, 0%, 15%);
+}
+
+.remark-slide {
+  border-top: 5px solid hsl(0, 60%, 45%);
+}
+
+img {
+  width: 99%;
+  height: 99%;
+}
+
+.verb, .city-state {
+  width: 60%;
+  height: 60%;
+}
+
+.first-slide {
+  opacity: 0.7; 
+}
+
