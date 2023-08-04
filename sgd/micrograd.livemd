@@ -1,0 +1,216 @@
+# micrograd
+
+```elixir
+Mix.install([
+  :dg,
+  {:kino_vega_lite, "~> 0.1.9"},
+  {:vega_lite, "~> 0.1.6"}
+])
+```
+
+## Section
+
+```elixir
+defmodule Value do
+  @moduledoc "stores a single scalar value and its gradient"
+  defstruct data: nil,
+            grad: 0,
+            label: "",
+            _backward: nil,
+            _op: "",
+            _prev: []
+
+  def wrapper(nodes), do: %{_prev: nodes}
+
+  def add(%Value{} = left, %Value{} = right, label: label) do
+    out = %Value{
+      data: left.data + right.data,
+      _prev: previous(left, right),
+      _op: "+",
+      label: label
+    }
+
+    backward = fn node ->
+      left = %Value{left | grad: left.grad + node.grad}
+      right = %Value{right | grad: right.grad + node.grad}
+      %Value{node | _prev: previous(left, right)}
+    end
+
+    %Value{out | _backward: backward}
+  end
+
+  def mult(%Value{} = left, %Value{} = right, label: label) do
+    out = %Value{
+      data: left.data * right.data,
+      _prev: previous(left, right),
+      _op: "*",
+      label: label
+    }
+
+    backward = fn node ->
+      left = %Value{left | grad: right.data * node.grad}
+      right = %Value{right | grad: left.data * node.grad}
+      %Value{node | _prev: previous(left, right)}
+    end
+
+    %Value{out | _backward: backward}
+  end
+
+  def previous(left, right) do
+    [left, right]
+  end
+
+  def backward(root) do
+    counted = recurse_backward(root, 0, [])
+
+    root._prev
+    |> Enum.map(fn child ->
+      Enum.map(counted, fn c ->
+        case child do
+          %{_prev: [_left | _right] = prev} = node ->
+            Enum.map(prev, fn n ->
+              IO.inspect(n, label: "n")
+
+              if n.label == c.label do
+                %Value{n | grad: c.grad}
+              else
+                node
+              end
+            end)
+
+          leaf ->
+            if leaf.label == c.label do
+              %Value{leaf | grad: c.grad}
+            else
+              leaf
+            end
+        end
+      end)
+    end)
+  end
+
+  def recurse_backward(node, count, counted) do
+    next =
+      if count == 0 do
+        # when last node, set grad to 1 for backprop
+        %Value{node | grad: 1}
+      else
+        node
+      end
+
+    if next && next._backward do
+      next = next._backward.(next)
+
+      Enum.reduce(next._prev, counted, fn
+        %{_prev: [_left | _right]} = child, counted ->
+          counted = counted ++ [child]
+
+          if child._op != "" do
+            # if there is a child node to recurse on
+            recurse_backward(child, count + 1, counted)
+          end
+
+        child, counted ->
+          counted = counted ++ [child]
+      end)
+    end
+  end
+end
+```
+
+```elixir
+a = %Value{data: 2, label: "a"}
+b = %Value{data: -3, label: "b"}
+c = %Value{data: 10, label: "c"}
+d = Value.mult(a, b, label: "e") |> Value.add(c, label: "d")
+d = Value.wrapper(d)
+```
+
+```mermaid
+graph LR
+    +135[+]-->d[d -> data 4 -> grad 0]
+    f[f -> data -2 -> grad 0]-->*700[*]
+    b[b -> data -3 -> grad 0]-->*93[*]
+    *93[*]-->e[e -> data -6 -> grad 0]
+    e[e -> data -6 -> grad 0]-->+135[+]
+    *700[*]-->L[L -> data -8 -> grad 0]
+    c[c -> data 10 -> grad 0]-->+135[+]
+    a[a -> data 2 -> grad 0]-->*93[*]
+    d[d -> data 4 -> grad 0]-->*700[*]
+
+```
+
+```elixir
+defmodule Graph do
+  def draw_dot(root) do
+    dot = DG.new()
+    build_dot(root, dot, %{count: 0, ops: [], rids: []})
+
+    dot
+  end
+
+  def build_dot(node, dot, visited) do
+    label = "#{node.label} -> data #{node.data} -> grad #{node.grad}"
+    rid = to_string(:rand.uniform(1000))
+
+    DG.add_vertex(dot, node.label, label)
+
+    count = Map.get(visited, :count)
+    ops = Map.get(visited, :ops)
+    rids = Map.get(visited, :rids)
+    val = [node._op]
+    visited = %{count: count + 1, ops: ops ++ val, rids: rids ++ [rid]}
+
+    if node._op != "" do
+      # create left _op vertex and connect to right edge
+      DG.add_vertex(dot, "#{node._op}" <> rid, node._op)
+      DG.add_edge(dot, "#{node._op}" <> rid, node.label)
+    end
+
+    if count != 0 do
+      # if not root node, create edge between vertex and _op
+      ops = Map.get(visited, :ops)
+      op = Enum.at(ops, count - 1)
+      rid = Enum.at(rids, count - 1)
+      DG.add_edge(dot, node.label, op <> rid)
+    end
+
+    Enum.map(node._prev, fn child ->
+      build_dot(child, dot, visited)
+    end)
+  end
+end
+```
+
+```elixir
+d._prev
+|> Value.backward()
+|> Map.from_struct()
+|> Graph.draw_dot()
+```
+
+```mermaid
+graph LR
+    +-->d[d -> data 4 -> grad 1]
+    b[b -> data -3 -> grad 0]-->*
+    e[e -> data -6 -> grad 1]-->+
+    c[c -> data 10 -> grad 1]-->+
+    a[a -> data 2 -> grad 0]-->*
+    *-->e[e -> data -6 -> grad 1]
+
+```
+
+```elixir
+a = %Value{data: 2, label: "a"}
+b = %Value{data: -3, label: "b"}
+c = %Value{data: 10, label: "c"}
+e = Value.mult(a, b, label: "e")
+d = Value.add(e, c, label: "d")
+f = %Value{data: -2, label: "f"}
+l = Value.mult(d, f, label: "L")
+
+l
+|> Value.backward()
+|> Map.from_struct()
+|> Graph.draw_dot()
+```

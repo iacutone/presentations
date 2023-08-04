@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Title</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body { font-family: 'Droid Serif'; }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle
+
+# Learn Stochastic Gradient Descent in 30 Minutes
+
+![jpeg](images/qr_code.png)
+
+---
+
+# Agenda
+
+1. Welcome
+1. Intro
+1. 10k Foot View
+1. Why?
+1. First Principle
+1. Recipes
+1. Conclusion
+
+---
+
+# Welcome
+
+![gif](images/hello.gif)
+
+---
+
+# Welcome
+
+![jpeg](images/avatar.jpeg)
+
+---
+class: center, middle
+
+# Intro
+
+
+![svg](images/icon-cars-app.png)
+
+---
+
+# 10k Foot View
+
+
+![png](images/nn.png)
+
+---
+
+# Why Learn SGD?
+
+--
+
+It's arguably the most important algorithm in machine learning.
+
+
+--
+
+SGD is the building block of deep neural networks. When ChatGPT predicts the next word in a sequence, a form of SGD was used the train the model.
+
+---
+
+# Learning From First Principles
+
+- insert painting 1
+
+- insert last painting
+
+
+---
+
+# SGD Ingredients
+
+## The Derivative
+
+![svg](images/CodeCogsEqn.svg)
+
+--
+
+y = 5x
+
+--
+
+dy/dx = (5(x+h) - 5x) / h 
+
+--
+
+      = 5x + 5h - 5x / h
+
+--
+
+      = 5h / h
+
+--
+
+      = 5
+
+--
+
+In other words, the derivative tells us the sensitivity of the function to change.
+
+---
+
+# SGD Ingredients
+
+## The Derivative
+
+![svg](images/CodeCogsEqn.svg)
+
+### Applied in SGD
+
+
+- we will use this fundamental rule of calculus to calculate the gradient of a neural network.
+
+--
+
+- we will change _h_ a little to determine how a small changes effects the gradient, does the gradient increase or decrease?
+
+---
+
+# SGD Ingredients
+
+## The Chain Rule
+
+![png](images/chainrule.png)
+
+--
+
+"If a car travels twice as fast as a bicycle and the bicycle is four times as fast as a walking man, then the car travels 2 × 4 = 8 times as fast as the man." - [George F. Simmons](https://en.wikipedia.org/wiki/Chain_rule)
+
+
+--
+
+We can take advatage of this rule to calculate the gradient of a neural network via the derivative.
+
+---
+
+# SGD Ingredients
+
+## The Chain Rule
+
+![png](images/chainrule.png)
+
+### Applied in SGD
+
+- if the nodes are added (gradient values flow backward to previous nodes):
+
+--
+
+c = a + b
+
+--
+
+dc/da = 1
+
+dc/db = 1
+
+---
+
+# SGD Ingredients
+
+## The Chain Rule
+
+![png](images/chainrule.png)
+
+### Applied in SGD
+
+- if the nodes are multiplied (node gradient values are dependent upon the gradient value * the derivative of the other nodes gradient):
+
+--
+
+c = a*b
+
+da/dc = b
+
+db/dc = a
+
+---
+
+# Neural Network Ingredients
+
+## Weights 
+## Activations
+## Fordward Pass
+## Backward Pass
+
+
+![png](images/nn.png)
+
+---
+
+# LiveBook Deep Dive
+
+
+## Example Value Struct
+
+
+```rb
+%Value{
+  data: 4,
+  grad: 0,
+  label: "d",
+  _backward: true,
+  _op: "+",
+  _prev: MapSet.new([
+    %Value{data: 10, grad: 0, label: "c", _backward: false, _op: "", _prev: MapSet.new([])},
+    %Value{
+      data: -6,
+      grad: 0,
+      label: "e",
+      _backward: true,
+      _op: "*",
+      _prev: MapSet.new([
+        %Value{data: -3, grad: 0, label: "b", _backward: false, _op: "", _prev: MapSet.new([])},
+        %Value{data: 2, grad: 0, label: "a", _backward: false, _op: "", _prev: MapSet.new([])}
+      ])
+    }
+  ])
+}
+```
+
+---
+
+## What is a DAG?
+
+--
+
+![png](images/nodes.png)
+- A graph made up of vertices and edges. The vertices are the boxes and the edges are the lines connecting the boxes.
+
+---
+
+# Conclusion
+
+---
+
+# Additional Resources
+
+- [The spelled-out intro to neural networks and backpropagation: building micrograd](https://www.youtube.com/watch?v=VMj-3S1tku0) -- Andrej Karpathy
+- [fast.ai](https://www.fast.ai/) -- Jeremy Howard
+- [My LiveBook GH Repo](https://github.com/iacutone/presentations/sgd)
+
+
+---
+
+class: center, middle
+
+# FIN
+
+
+    </textarea>
+    <script src="../remark.min.js"></script>
+    <script>
+      var slideshow = remark.create();
+    </script>
+  </body>
+</html>
