@@ -20,7 +20,14 @@ defmodule Value do
             _op: "",
             _prev: []
 
-  def wrapper(nodes), do: %{_prev: nodes}
+  @type t :: %Value{
+          data: nil | Integer.t(),
+          grad: Integer.t(),
+          label: String.t(),
+          _backward: fun(any),
+          _op: String.t(),
+          _prev: [%Value{}]
+        }
 
   def add(%Value{} = left, %Value{} = right, label: label) do
     out = %Value{
@@ -61,32 +68,65 @@ defmodule Value do
   end
 
   def backward(root) do
-    counted = recurse_backward(root, 0, [])
+    gradients = recurse_backward(root, 0, %{})
 
-    root._prev
-    |> Enum.map(fn child ->
-      Enum.map(counted, fn c ->
-        case child do
-          %{_prev: [_left | _right] = prev} = node ->
-            Enum.map(prev, fn n ->
-              IO.inspect(n, label: "n")
-
-              if n.label == c.label do
-                %Value{n | grad: c.grad}
-              else
-                node
-              end
-            end)
-
-          leaf ->
-            if leaf.label == c.label do
-              %Value{leaf | grad: c.grad}
-            else
-              leaf
-            end
-        end
-      end)
+    gradients
+    |> Enum.reduce(root, fn {label, gradient}, acc ->
+      update_node(acc, label, gradient)
     end)
+  end
+
+  def update_node(
+        %Value{
+          data: data,
+          grad: _grad,
+          label: label,
+          _backward: backward,
+          _op: op,
+          _prev: prev
+        },
+        label,
+        new_value
+      ) do
+    %Value{
+      data: data,
+      grad: new_value,
+      label: label,
+      _backward: backward,
+      _op: op,
+      _prev: prev
+    }
+  end
+
+  def update_node(%Value{_prev: []} = root, _value, _new_value) do
+    root
+  end
+
+  def update_node(
+        %Value{
+          data: data,
+          grad: grad,
+          label: label,
+          _backward: backward,
+          _op: op,
+          _prev: prev
+        },
+        other_label,
+        new_value
+      ) do
+    updated_children =
+      Enum.map(prev, fn child ->
+        update_node(child, other_label, new_value)
+      end)
+
+    %Value{
+      data: data,
+      grad: grad,
+      label: label,
+      _backward: backward,
+      _op: op,
+      _prev: updated_children
+    }
   end
 
   def recurse_backward(node, count, counted) do
@@ -103,7 +143,7 @@ defmodule Value do
 
       Enum.reduce(next._prev, counted, fn
         %{_prev: [_left | _right]} = child, counted ->
-          counted = counted ++ [child]
+          counted = Map.put(counted, child.label, child.grad)
 
           if child._op != "" do
             # if there is a child node to recurse on
@@ -111,7 +151,7 @@ defmodule Value do
           end
 
         child, counted ->
-          counted = counted ++ [child]
+          Map.put(counted, child.label, child.grad)
       end)
     end
   end
@@ -123,21 +163,6 @@ a = %Value{data: 2, label: "a"}
 b = %Value{data: -3, label: "b"}
 c = %Value{data: 10, label: "c"}
 d = Value.mult(a, b, label: "e") |> Value.add(c, label: "d")
-d = Value.wrapper(d)
-```
-
-```mermaid
-graph LR
-    +135[+]-->d[d -> data 4 -> grad 0]
-    f[f -> data -2 -> grad 0]-->*700[*]
-    b[b -> data -3 -> grad 0]-->*93[*]
-    *93[*]-->e[e -> data -6 -> grad 0]
-    e[e -> data -6 -> grad 0]-->+135[+]
-    *700[*]-->L[L -> data -8 -> grad 0]
-    c[c -> data 10 -> grad 0]-->+135[+]
-    a[a -> data 2 -> grad 0]-->*93[*]
-    d[d -> data 4 -> grad 0]-->*700[*]
-
 ```
 
 ```elixir
@@ -183,7 +208,7 @@ end
 ```
 
 ```elixir
-d._prev
+d
 |> Value.backward()
 |> Map.from_struct()
 |> Graph.draw_dot()
@@ -191,12 +216,13 @@ d._prev
 
 ```mermaid
 graph LR
-    +-->d[d -> data 4 -> grad 1]
-    b[b -> data -3 -> grad 0]-->*
-    e[e -> data -6 -> grad 1]-->+
-    c[c -> data 10 -> grad 1]-->+
-    a[a -> data 2 -> grad 0]-->*
-    *-->e[e -> data -6 -> grad 1]
+    b[b -> data -3 -> grad -3]-->*238[*]
+    +507[+]-->d[d -> data 4 -> grad 1]
+    e[e -> data -6 -> grad 1]-->+507[+]
+    c[c -> data 10 -> grad 1]-->+507[+]
+    a[a -> data 2 -> grad -2]-->*238[*]
+    *238[*]-->e[e -> data -6 -> grad 1]
+
 
 ```
 
@@ -213,4 +239,17 @@ l
 |> Value.backward()
 |> Map.from_struct()
 |> Graph.draw_dot()
+```
+
+```mermaid
+graph LR
+    f[f -> data -2 -> grad 4]-->*427[*]
+    b[b -> data -3 -> grad -4]-->*477[*]
+    +548[+]-->d[d -> data 4 -> grad -2]
+    *477[*]-->e[e -> data -6 -> grad -2]
+    *427[*]-->L[L -> data -8 -> grad 0]
+    e[e -> data -6 -> grad -2]-->+548[+]
+    c[c -> data 10 -> grad -2]-->+548[+]
+    a[a -> data 2 -> grad 6]-->*477[*]
+    d[d -> data 4 -> grad -2]-->*427[*]
 ```
