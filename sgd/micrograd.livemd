@@ -3,6 +3,7 @@
 ```elixir
 Mix.install([
   :dg,
+  {:kino, "~> 0.10.0"},
   {:kino_vega_lite, "~> 0.1.9"},
   {:vega_lite, "~> 0.1.6"}
 ])
@@ -21,7 +22,7 @@ defmodule Value do
             _prev: []
 
   @type t :: %Value{
-          data: nil | Integer.t(),
+          data: Integer.t() | nil,
           grad: Integer.t(),
           label: String.t(),
           _backward: fun(any),
@@ -58,6 +59,24 @@ defmodule Value do
       left = %Value{left | grad: right.data * node.grad}
       right = %Value{right | grad: left.data * node.grad}
       %Value{node | _prev: previous(left, right)}
+    end
+
+    %Value{out | _backward: backward}
+  end
+
+  def tanh(%Value{data: data} = prev, label: label) do
+    t = (:math.exp(2 * data) - 1) / (:math.exp(2 * data) + 1)
+
+    out = %Value{
+      data: t,
+      label: label,
+      _prev: [prev],
+      _op: "tanh"
+    }
+
+    backward = fn node ->
+      prev = %Value{prev | grad: 1 - t ** 2}
+      %Value{node | _prev: [prev]}
     end
 
     %Value{out | _backward: backward}
@@ -130,16 +149,17 @@ defmodule Value do
   end
 
   def recurse_backward(node, count, counted) do
-    next =
+    {next, counted} =
       if count == 0 do
         # when last node, set grad to 1 for backprop
-        %Value{node | grad: 1}
+        {%Value{node | grad: 1}, Map.put(counted, node.label, 1)}
       else
-        node
+        {node, counted}
       end
 
     if next && next._backward do
       next = next._backward.(next)
+      # IO.inspect next, label: "next"
 
       Enum.reduce(next._prev, counted, fn
         %{_prev: [_left | _right]} = child, counted ->
@@ -216,14 +236,12 @@ d
 
 ```mermaid
 graph LR
-    b[b -> data -3 -> grad -3]-->*238[*]
-    +507[+]-->d[d -> data 4 -> grad 1]
-    e[e -> data -6 -> grad 1]-->+507[+]
-    c[c -> data 10 -> grad 1]-->+507[+]
-    a[a -> data 2 -> grad -2]-->*238[*]
-    *238[*]-->e[e -> data -6 -> grad 1]
-
-
+    b[b -> data -3 -> grad 2]-->*215[*]
+    +164[+]-->d[d -> data 4 -> grad 1]
+    *215[*]-->e[e -> data -6 -> grad 1]
+    e[e -> data -6 -> grad 1]-->+164[+]
+    c[c -> data 10 -> grad 1]-->+164[+]
+    a[a -> data 2 -> grad -3]-->*215[*]
 ```
 
 ```elixir
@@ -243,13 +261,126 @@ l
 
 ```mermaid
 graph LR
-    f[f -> data -2 -> grad 4]-->*427[*]
-    b[b -> data -3 -> grad -4]-->*477[*]
-    +548[+]-->d[d -> data 4 -> grad -2]
-    *477[*]-->e[e -> data -6 -> grad -2]
-    *427[*]-->L[L -> data -8 -> grad 0]
-    e[e -> data -6 -> grad -2]-->+548[+]
-    c[c -> data 10 -> grad -2]-->+548[+]
-    a[a -> data 2 -> grad 6]-->*477[*]
-    d[d -> data 4 -> grad -2]-->*427[*]
+    f[f -> data -2 -> grad 4]-->*501[*]
+    *650[*]-->e[e -> data -6 -> grad -2]
+    b[b -> data -3 -> grad -4]-->*650[*]
+    +918[+]-->d[d -> data 4 -> grad -2]
+    *501[*]-->L[L -> data -8 -> grad 1]
+    e[e -> data -6 -> grad -2]-->+918[+]
+    c[c -> data 10 -> grad -2]-->+918[+]
+    a[a -> data 2 -> grad 6]-->*650[*]
+    d[d -> data 4 -> grad -2]-->*501[*]
+```
+
+```elixir
+x1 = %Value{data: 2.0, label: "x1"}
+x2 = %Value{data: 0.0, label: "x2"}
+
+w1 = %Value{data: -3.0, label: "w1"}
+w2 = %Value{data: 1.0, label: "w2"}
+
+b = %Value{data: 6.881373587019541, label: "b"}
+
+x1w1 = Value.mult(x1, w1, label: "x1*w1")
+x2w2 = Value.mult(x2, w2, label: "x2*w2")
+x1w1x2w2 = Value.add(x1w1, x2w2, label: "x1*w1+x2*w2")
+n = Value.add(x1w1x2w2, b, label: "n")
+o = Value.tanh(n, label: "o")
+
+o
+|> Value.backward()
+|> Map.from_struct()
+|> Graph.draw_dot()
+```
+
+```mermaid
+graph LR
+    +417[+]-->x1*w1+x2*w2[x1*w1+x2*w2 -> data -6.0 -> grad 0.5]
+    b[b -> data 6.881373587019541 -> grad 0.50]-->+887[+]
+    x1[x1 -> data 2.0 -> grad -1.5]-->*191[*]
+    *558[*]-->x2*w2[x2*w2 -> data 0.0 -> grad 0.5]
+    w2[w2 -> data 1.0 -> grad 0.0]-->*558[*]
+    x1*w1[x1*w1 -> data -6.0 -> grad 0.5]-->+417[+]
+    x1*w1+x2*w2[x1*w1+x2*w2 -> data -6.0 -> grad 0.5]-->+887[+]
+    tanh583[tanh]-->o[o -> data 0.7071067811865467 -> grad 1]
+    +887[+]-->n[n -> data 0.8813735870195414 -> grad 0.5]
+    *191[*]-->x1*w1[x1*w1 -> data -6.0 -> grad 0.5]
+    w1[w1 -> data -3.0 -> grad 1.0]-->*191[*]
+    n[n -> data 0.8813735870195414 -> grad 0.5]-->tanh583[tanh]
+    x2*w2[x2*w2 -> data 0.0 -> grad 0.5]-->+417[+]
+    x2[x2 -> data 0.0 -> grad 0.5]-->*558[*]
+```
+
+```elixir
+# defmodule Module do
+#   def zero_grad(%Module{} = self) do
+#     %Module{self | w: Enum.map(self.w, &(&1.zero_grad())), b: 0}
+#   end
+
+#   def parameters(_self) do
+#     []
+#   end
+# end
+
+defmodule Neuron do
+  defstruct w: [], b: 0, nonlin?: true
+
+  def new(nin, nonlin \\ true) do
+    w = for _ <- 1..nin, do: Enum.random(-100..100) / 100
+    %Neuron{w: w, b: 0, nonlin?: nonlin}
+  end
+
+  def call(%Neuron{w: w, b: b, nonlin?: nonlin}, x) do
+    act = Enum.reduce(Enum.zip(w, x), b, fn {wi, xi}, acc -> acc + wi * xi end)
+    if nonlin, do: relu(act), else: act
+  end
+
+  def parameters(%Neuron{w: w, b: b}) do
+    w ++ [b]
+  end
+
+  defp relu(x) when x >= 0, do: x
+  defp relu(_), do: 0
+end
+
+defmodule Layer do
+  defstruct neurons: []
+
+  def new(nin, nout, nonlin \\ true) do
+    neurons = for _ <- 1..nout, do: Neuron.new(nin, nonlin)
+    %Layer{neurons: neurons}
+  end
+
+  def call(%Layer{neurons: neurons}, x) do
+    Enum.map(neurons, &Neuron.call(&1, x))
+  end
+
+  def parameters(%Layer{neurons: neurons}) do
+    Enum.flat_map(neurons, &Neuron.parameters/1)
+  end
+end
+
+defmodule MLP do
+  defstruct layers: []
+
+  def new(nin, nouts) do
+    sz = [nin | nouts]
+
+    layers =
+      Enum.zip(sz, Enum.drop(sz, 1))
+      |> Enum.map(fn {nin, nout} ->
+        Layer.new(nin, nout, nonlin: nout != hd(nouts))
+      end)
+
+    %MLP{layers: layers}
+  end
+
+  def call(%MLP{layers: layers}, x) do
+    Enum.reduce(layers, x, &Layer.call(&1, &2))
+  end
+
+  def parameters(%MLP{layers: layers}) do
+    Enum.flat_map(layers, &Layer.parameters/1)
+  end
+end
 ```
