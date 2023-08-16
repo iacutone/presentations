@@ -3,13 +3,11 @@
 ```elixir
 Mix.install([
   :dg,
-  {:kino, "~> 0.10.0"},
-  {:kino_vega_lite, "~> 0.1.9"},
-  {:vega_lite, "~> 0.1.6"}
+  :axon
 ])
 ```
 
-## Section
+## Value Tree
 
 ```elixir
 defmodule Value do
@@ -30,15 +28,19 @@ defmodule Value do
           _prev: [%Value{}]
         }
 
-  def add(%Value{} = left, %Value{} = right, label: label) do
+  def add(%Value{} = left, %Value{} = right, label \\ "add", grad \\ 0) do
     out = %Value{
       data: left.data + right.data,
+      grad: grad,
       _prev: previous(left, right),
       _op: "+",
       label: label
     }
 
     backward = fn node ->
+      # IO.inspect node, label: "node"
+      # IO.inspect left, label: "left"
+      # IO.inspect right, label: "right"
       left = %Value{left | grad: left.grad + node.grad}
       right = %Value{right | grad: right.grad + node.grad}
       %Value{node | _prev: previous(left, right)}
@@ -47,9 +49,10 @@ defmodule Value do
     %Value{out | _backward: backward}
   end
 
-  def mult(%Value{} = left, %Value{} = right, label: label) do
+  def mult(%Value{} = left, %Value{} = right, label \\ "mult", grad \\ 0) do
     out = %Value{
       data: left.data * right.data,
+      grad: grad,
       _prev: previous(left, right),
       _op: "*",
       label: label
@@ -58,17 +61,20 @@ defmodule Value do
     backward = fn node ->
       left = %Value{left | grad: right.data * node.grad}
       right = %Value{right | grad: left.data * node.grad}
+      # IO.inspect left, label: "left"
+      # IO.inspect right, label: "right"
       %Value{node | _prev: previous(left, right)}
     end
 
     %Value{out | _backward: backward}
   end
 
-  def tanh(%Value{data: data} = prev, label: label) do
+  def tanh(%Value{data: data} = prev, label \\ "tanh", grad \\ 1) do
     t = (:math.exp(2 * data) - 1) / (:math.exp(2 * data) + 1)
 
     out = %Value{
       data: t,
+      grad: grad,
       label: label,
       _prev: [prev],
       _op: "tanh"
@@ -86,56 +92,30 @@ defmodule Value do
     [left, right]
   end
 
-  def backward(root) do
-    gradients = recurse_backward(root, 0, %{})
-
-    gradients
-    |> Enum.reduce(root, fn {label, gradient}, acc ->
-      update_node(acc, label, gradient)
-    end)
-  end
-
-  def update_node(
-        %Value{
-          data: data,
-          grad: _grad,
-          label: label,
-          _backward: backward,
-          _op: op,
-          _prev: prev
-        },
-        label,
-        new_value
-      ) do
-    %Value{
-      data: data,
-      grad: new_value,
-      label: label,
-      _backward: backward,
-      _op: op,
-      _prev: prev
-    }
-  end
-
-  def update_node(%Value{_prev: []} = root, _value, _new_value) do
+  def backward1(%Value{_prev: []} = root) do
     root
   end
 
-  def update_node(
+  def backward1(
         %Value{
           data: data,
           grad: grad,
           label: label,
-          _backward: backward,
           _op: op,
-          _prev: prev
-        },
-        other_label,
-        new_value
+          # _prev: nodes,
+          _backward: backward
+        } = node
       ) do
+    node =
+      if node._backward do
+        node._backward.(node)
+      else
+        node
+      end
+
     updated_children =
-      Enum.map(prev, fn child ->
-        update_node(child, other_label, new_value)
+      Enum.map(node._prev, fn child ->
+        backward1(child)
       end)
 
     %Value{
@@ -148,42 +128,48 @@ defmodule Value do
     }
   end
 
-  def recurse_backward(node, count, counted) do
-    {next, counted} =
-      if count == 0 do
-        # when last node, set grad to 1 for backprop
-        {%Value{node | grad: 1}, Map.put(counted, node.label, 1)}
-      else
-        {node, counted}
-      end
+  def backprop(%Value{_prev: []} = root) do
+    root
+  end
 
-    if next && next._backward do
-      next = next._backward.(next)
-      # IO.inspect next, label: "next"
-
-      Enum.reduce(next._prev, counted, fn
-        %{_prev: [_left | _right]} = child, counted ->
-          counted = Map.put(counted, child.label, child.grad)
-
-          if child._op != "" do
-            # if there is a child node to recurse on
-            recurse_backward(child, count + 1, counted)
-          end
-
-        child, counted ->
-          Map.put(counted, child.label, child.grad)
+  def backprop(%Value{
+        data: data,
+        grad: grad,
+        label: label,
+        _backward: backward,
+        _op: op,
+        _prev: prev
+      }) do
+    updated_children =
+      Enum.map(prev, fn child ->
+        backprop(child)
       end)
-    end
+
+    IO.inspect(data, label: "data")
+    IO.inspect(grad, label: "grad")
+
+    %Value{
+      data: data + -0.1 * grad,
+      grad: grad,
+      label: label,
+      _backward: backward,
+      _op: op,
+      _prev: updated_children
+    }
   end
 end
 ```
+
+## Interacting with the Value API
 
 ```elixir
 a = %Value{data: 2, label: "a"}
 b = %Value{data: -3, label: "b"}
 c = %Value{data: 10, label: "c"}
-d = Value.mult(a, b, label: "e") |> Value.add(c, label: "d")
+d = Value.mult(a, b, "e") |> Value.add(c, "d", 1)
 ```
+
+## Add Value Tree Visualizations
 
 ```elixir
 defmodule Graph do
@@ -217,7 +203,7 @@ defmodule Graph do
       ops = Map.get(visited, :ops)
       op = Enum.at(ops, count - 1)
       rid = Enum.at(rids, count - 1)
-      DG.add_edge(dot, node.label, op <> rid)
+      DG.add_edge(dot, String.trim(node.label), String.trim(op) <> rid)
     end
 
     Enum.map(node._prev, fn child ->
@@ -229,8 +215,7 @@ end
 
 ```elixir
 d
-|> Value.backward()
-|> Map.from_struct()
+|> Value.backward1()
 |> Graph.draw_dot()
 ```
 
@@ -244,33 +229,36 @@ graph LR
     a[a -> data 2 -> grad -3]-->*215[*]
 ```
 
+## A More Complicated Value Tree
+
 ```elixir
 a = %Value{data: 2, label: "a"}
 b = %Value{data: -3, label: "b"}
 c = %Value{data: 10, label: "c"}
-e = Value.mult(a, b, label: "e")
-d = Value.add(e, c, label: "d")
+e = Value.mult(a, b, "e")
+d = Value.add(e, c, "d")
 f = %Value{data: -2, label: "f"}
-l = Value.mult(d, f, label: "L")
+l = Value.mult(d, f, "L", 1)
 
 l
-|> Value.backward()
-|> Map.from_struct()
+|> Value.backward1()
 |> Graph.draw_dot()
 ```
 
 ```mermaid
 graph LR
-    f[f -> data -2 -> grad 4]-->*501[*]
-    *650[*]-->e[e -> data -6 -> grad -2]
-    b[b -> data -3 -> grad -4]-->*650[*]
-    +918[+]-->d[d -> data 4 -> grad -2]
-    *501[*]-->L[L -> data -8 -> grad 1]
-    e[e -> data -6 -> grad -2]-->+918[+]
-    c[c -> data 10 -> grad -2]-->+918[+]
-    a[a -> data 2 -> grad 6]-->*650[*]
-    d[d -> data 4 -> grad -2]-->*501[*]
+    f[f -> data -2 -> grad 4]-->*47[*]
+    b[b -> data -3 -> grad -4]-->*902[*]
+    *47[*]-->L[L -> data -8 -> grad 1]
+    e[e -> data -6 -> grad -2]-->+965[+]
+    c[c -> data 10 -> grad -2]-->+965[+]
+    a[a -> data 2 -> grad 6]-->*902[*]
+    *902[*]-->e[e -> data -6 -> grad -2]
+    +965[+]-->d[d -> data 4 -> grad -2]
+    d[d -> data 4 -> grad -2]-->*47[*]
 ```
+
+## Value Tree with Weights
 
 ```elixir
 x1 = %Value{data: 2.0, label: "x1"}
@@ -281,15 +269,14 @@ w2 = %Value{data: 1.0, label: "w2"}
 
 b = %Value{data: 6.881373587019541, label: "b"}
 
-x1w1 = Value.mult(x1, w1, label: "x1*w1")
-x2w2 = Value.mult(x2, w2, label: "x2*w2")
-x1w1x2w2 = Value.add(x1w1, x2w2, label: "x1*w1+x2*w2")
-n = Value.add(x1w1x2w2, b, label: "n")
-o = Value.tanh(n, label: "o")
+x1w1 = Value.mult(x1, w1, "x1*w1")
+x2w2 = Value.mult(x2, w2, "x2*w2")
+x1w1x2w2 = Value.add(x1w1, x2w2, "x1*w1+x2*w2")
+n = Value.add(x1w1x2w2, b, "n")
+o = Value.tanh(n, "o", 1)
 
 o
-|> Value.backward()
-|> Map.from_struct()
+|> Value.backward1()
 |> Graph.draw_dot()
 ```
 
@@ -312,75 +299,956 @@ graph LR
 ```
 
 ```elixir
-# defmodule Module do
-#   def zero_grad(%Module{} = self) do
-#     %Module{self | w: Enum.map(self.w, &(&1.zero_grad())), b: 0}
-#   end
+# do Axon example instead of Neuron module
+```
 
-#   def parameters(_self) do
-#     []
-#   end
-# end
-
+```elixir
 defmodule Neuron do
-  defstruct w: [], b: 0, nonlin?: true
-
-  def new(nin, nonlin \\ true) do
-    w = for _ <- 1..nin, do: Enum.random(-100..100) / 100
-    %Neuron{w: w, b: 0, nonlin?: nonlin}
+  def rid do
+    to_string(:rand.uniform(1000))
   end
 
-  def call(%Neuron{w: w, b: b, nonlin?: nonlin}, x) do
-    act = Enum.reduce(Enum.zip(w, x), b, fn {wi, xi}, acc -> acc + wi * xi end)
-    if nonlin, do: relu(act), else: act
+  def new(nin) do
+    # Weight parameter inputs, these values change as via SGD as the network 'learns'
+    weights =
+      Enum.reduce(0..(nin - 1), [], fn _i, acc ->
+        acc ++ [%Value{data: Enum.random(-100..100) / 100, label: "weight#{rid()}"}]
+      end)
+
+    %{weights: weights, b: %Value{data: Enum.random(-100..100) / 100, label: "bias#{rid()}"}}
   end
 
-  def parameters(%Neuron{w: w, b: b}) do
-    w ++ [b]
+  def call(x, %{weights: weights, b: b}) do
+    rid = rid()
+
+    activations =
+      x
+      |> Enum.zip(weights)
+      |> Enum.map(fn {x, %Value{label: label} = neuron} ->
+        Value.mult(
+          %Value{
+            data: x,
+            _op: "activation" <> rid,
+            label: "weightinput#{x}-" <> rid
+          },
+          neuron,
+          "activation" <> rid
+        )
+      end)
+
+    sum =
+      Enum.map(activations, fn %{data: data} ->
+        data
+      end)
+      |> Enum.sum()
+
+    activations =
+      Value.add(
+        %Value{
+          data: sum,
+          label: "activation" <> rid,
+          _prev: activations
+        },
+        b,
+        "add" <> rid
+      )
+
+    Value.tanh(activations, "ypred" <> rid)
   end
 
-  defp relu(x) when x >= 0, do: x
-  defp relu(_), do: 0
+  def parameters(neuron) do
+    bias = Map.get(neuron, :b)
+    weights = Map.get(neuron, :weights)
+
+    weights ++ [bias]
+  end
 end
 
 defmodule Layer do
-  defstruct neurons: []
-
-  def new(nin, nout, nonlin \\ true) do
-    neurons = for _ <- 1..nout, do: Neuron.new(nin, nonlin)
-    %Layer{neurons: neurons}
+  def new(nin, nout) do
+    Enum.reduce(0..(nout - 1), [], fn _i, acc ->
+      acc ++ [Neuron.new(nin)]
+    end)
   end
 
-  def call(%Layer{neurons: neurons}, x) do
-    Enum.map(neurons, &Neuron.call(&1, x))
+  def call(x, neurons) do
+    # IO.inspect neurons, label: "neurons"
+    Enum.map(neurons, fn neuron ->
+      Neuron.call(x, neuron)
+    end)
   end
 
-  def parameters(%Layer{neurons: neurons}) do
-    Enum.flat_map(neurons, &Neuron.parameters/1)
+  def parameters(layer) do
+    Enum.reduce(layer, [], fn neuron, acc ->
+      acc ++ Neuron.parameters(neuron)
+    end)
   end
 end
 
 defmodule MLP do
-  defstruct layers: []
-
   def new(nin, nouts) do
-    sz = [nin | nouts]
+    sz = [nin] ++ nouts
+    range = length(nouts) - 1
 
-    layers =
-      Enum.zip(sz, Enum.drop(sz, 1))
-      |> Enum.map(fn {nin, nout} ->
-        Layer.new(nin, nout, nonlin: nout != hd(nouts))
-      end)
+    Enum.reduce(0..range, [], fn i, acc ->
+      current_layer = Enum.at(sz, i)
+      next_layer = Enum.at(sz, i + 1)
 
-    %MLP{layers: layers}
+      acc ++ [Layer.new(current_layer, next_layer)]
+    end)
   end
 
-  def call(%MLP{layers: layers}, x) do
-    Enum.reduce(layers, x, &Layer.call(&1, &2))
+  def call(x, layers) do
+    Enum.map(layers, fn layer ->
+      Layer.call(x, layer)
+    end)
   end
 
-  def parameters(%MLP{layers: layers}) do
-    Enum.flat_map(layers, &Layer.parameters/1)
+  def parameters(layers) do
+    Enum.reduce(layers, [], fn layer, acc ->
+      acc ++ Layer.parameters(layer)
+    end)
   end
 end
+
+# x = [2.0, 3.0, -1]
+
+# x = [2.0, 3.0]
+# n = Neuron.new(3)
+# Neuron.call(x, n) |> Value.backward() |> Graph.draw_dot() #|> IO.inspect()
+
+# layer = Layer.new(2, 3)
+# Layer.call(x, layer) 
+# |> Enum.map(fn l ->
+#   Value.backward(l) 
+# end)
+
+# mlp = MLP.new(3, [1])
+# layers = MLP.call(x, mlp)
+# layers
+# |> List.flatten()
+# |> Enum.map(fn l ->
+#   Value.backward(l) 
+# end)
+
+# neurons = Neuron.new(3)
+# x
+# |> Neuron.call(neurons)
+# |> Value.backward()
+# |> Map.from_struct()
+# |> Graph.draw_dot()
+
+# layers = Layer.new(3, 2)
+# x
+# |> Layer.call(layers)
+# |> IO.inspect(label: "two layer")
+# |> Enum.map(fn layer ->
+#   Value.backward(layer)
+# end)
+# |> List.flatten()
+# |> Graph.draw_dot()
+
+# mlp = MLP.new(3, [4, 4, 1]) 
+# MLP.call(x, mlp)
+```
+
+```elixir
+# binary classifier example
+# inputs to the neural network
+xs = [
+  # when given these inputs, the output is 1
+  [2.0, 3.0, -1.0],
+  # when given these inputs, the output is -1
+  [3.0, 1.0, 0.5],
+  # when given these inputs, the output is -1
+  [0.5, 1.0, 1.0],
+  # when given these inputs, the output is 1
+  [1.0, 1.0, -1.0]
+]
+
+# y truth, the desired output
+ys = [1.0, -1.0, -1.0, 1.0]
+
+# first arg needs to be same length as xs list's length
+init_mlp = MLP.new(3, [1])
+```
+
+## All Together Now
+
+```elixir
+# Forward pass
+layers =
+  Enum.map(xs, fn row ->
+    MLP.call(row, init_mlp)
+  end)
+
+# select the last layer
+ypreds =
+  Enum.reduce(layers, [], fn l, acc ->
+    acc ++ List.last(l)
+  end)
+
+ypred =
+  ypreds
+  |> Enum.reduce([], fn %{data: data}, mse_list ->
+    mse_list ++ [data]
+  end)
+
+# single number that tells us how the network is performing
+mse =
+  Enum.zip(ys, ypred)
+  |> Enum.map(fn {y, data} ->
+    (data - y) ** 2
+  end)
+  |> Enum.sum()
+
+backward = fn node ->
+  node
+end
+
+# backward pass
+loss =
+  %Value{
+    data: mse,
+    grad: 1,
+    label: "mse",
+    _op: "loss",
+    _prev: List.flatten(layers),
+    _backward: backward
+  }
+  |> Value.backward1()
+  |> Value.backprop()
+  |> Graph.draw_dot()
+```
+
+```mermaid
+graph LR
+    loss656[loss]-->mse[mse -> data 3.522866991219371 -> grad 1]
+    activation634[activation634 -> data 0.6 -> grad 0]-->+74[+]
+    +74[+]-->add634[add634 -> data 0.9047278962952275 -> grad 0.45272103704772404]
+    add693[add693 -> data 0.006094446961614403 -> grad 0.9890555303838569]-->tanh891[tanh]
+    tanh284[tanh]-->ypred678[ypred678 -> data 0.4226654296858209 -> grad 1]
+    weightinput3.0-634[weightinput3.0-634 -> data 3.0 -> grad -0.0]-->*445[*]
+    *405[*]-->activation693[activation693 -> data -0.6 -> grad 0]
+    *645[*]-->activation678[activation678 -> data -0.3 -> grad 0]
+    add212[add212 -> data 1.3159812506520656 -> grad 0.2401874934793421]-->tanh294[tanh]
+    activation634147[activation634]-->weightinput2.0-634[weightinput2.0-634 -> data 2.0 -> grad 0.0]
+    *678[*]-->activation634[activation634 -> data 0.6 -> grad 0]
+    +985[+]-->add693[add693 -> data 0.006094446961614403 -> grad 0.9890555303838569]
+    weightinput-1.0-634[weightinput-1.0-634 -> data -1.0 -> grad -0.0]-->*678[*]
+    activation693363[activation693]-->weightinput1.0-693[weightinput1.0-693 -> data 1.0 -> grad -0.0]
+    tanh891[tanh]-->ypred693[ypred693 -> data 0.004615819148650599 -> grad 1]
+    weightinput0.5-678[weightinput0.5-678 -> data 0.5 -> grad -0.0]-->*889[*]
+    *9[*]-->activation212[activation212 -> data 0.6 -> grad 0]
+    activation693279[activation693]-->weightinput0.5-693[weightinput0.5-693 -> data 0.5 -> grad 0.0]
+    *889[*]-->activation678[activation678 -> data -0.3 -> grad 0]
+    activation212[activation212 -> data 0.6 -> grad 0]-->+287[+]
+    weightinput1.0-678[weightinput1.0-678 -> data 1.0 -> grad -0.0]-->*387[*]
+    +287[+]-->add212[add212 -> data 1.3159812506520656 -> grad 0.2401874934793421]
+    weightinput1.0-212[weightinput1.0-212 -> data 1.0 -> grad -0.0]-->*750[*]
+    weightinput1.0-212[weightinput1.0-212 -> data 1.0 -> grad -0.0]-->*9[*]
+    *466[*]-->activation693[activation693 -> data -0.6 -> grad 0]
+    activation212916[activation212]-->weightinput-1.0-212[weightinput-1.0-212 -> data -1.0 -> grad -0.0]
+    *225[*]-->activation693[activation693 -> data -0.6 -> grad 0]
+    weightinput3.0-678[weightinput3.0-678 -> data 3.0 -> grad 0.0]-->*645[*]
+    +647[+]-->add678[add678 -> data 0.5073179151388665 -> grad 0.7268208486113363]
+    *610[*]-->activation212[activation212 -> data 0.6 -> grad 0]
+    *445[*]-->activation634[activation634 -> data 0.6 -> grad 0]
+    tanh294[tanh]-->ypred212[ypred212 -> data 0.7716722471896521 -> grad 1]
+    weightinput-1.0-212[weightinput-1.0-212 -> data -1.0 -> grad -0.0]-->*610[*]
+    activation212444[activation212]-->weightinput1.0-212[weightinput1.0-212 -> data 1.0 -> grad -0.0]
+    activation678214[activation678]-->weightinput0.5-678[weightinput0.5-678 -> data 0.5 -> grad -0.0]
+    bias808[bias808 -> data 0.9 -> grad 0.2401874934793421]-->+74[+]
+    bias808[bias808 -> data 0.9 -> grad 0.2401874934793421]-->+647[+]
+    bias808[bias808 -> data 0.9 -> grad 0.2401874934793421]-->+985[+]
+    bias808[bias808 -> data 0.9 -> grad 0.2401874934793421]-->+287[+]
+    activation693[activation693 -> data -0.6 -> grad 0]-->+985[+]
+    tanh477[tanh]-->ypred634[ypred634 -> data 0.6397830512740043 -> grad 1]
+    weight664[weight664 -> data -0.6 -> grad -0.0]-->*678[*]
+    weight664[weight664 -> data -0.6 -> grad -0.0]-->*889[*]
+    weight664[weight664 -> data -0.6 -> grad -0.0]-->*466[*]
+    weight664[weight664 -> data -0.6 -> grad -0.0]-->*610[*]
+    ypred693[ypred693 -> data 0.004615819148650599 -> grad 1]-->loss656[loss]
+    activation678[activation678 -> data -0.3 -> grad 0]-->+647[+]
+    activation634598[activation634]-->weightinput3.0-634[weightinput3.0-634 -> data 3.0 -> grad -0.0]
+    add678[add678 -> data 0.5073179151388665 -> grad 0.7268208486113363]-->tanh284[tanh]
+    activation634607[activation634]-->weightinput-1.0-634[weightinput-1.0-634 -> data -1.0 -> grad -0.0]
+    *165[*]-->activation634[activation634 -> data 0.6 -> grad 0]
+    ypred678[ypred678 -> data 0.4226654296858209 -> grad 1]-->loss656[loss]
+    weight677[weight677 -> data 0.07 -> grad 0.0]-->*165[*]
+    weight677[weight677 -> data 0.07 -> grad 0.0]-->*645[*]
+    weight677[weight677 -> data 0.07 -> grad 0.0]-->*225[*]
+    weight677[weight677 -> data 0.07 -> grad 0.0]-->*750[*]
+    add634[add634 -> data 0.9047278962952275 -> grad 0.45272103704772404]-->tanh477[tanh]
+    weightinput1.0-693[weightinput1.0-693 -> data 1.0 -> grad -0.0]-->*405[*]
+    weightinput1.0-693[weightinput1.0-693 -> data 1.0 -> grad -0.0]-->*466[*]
+    weightinput0.5-693[weightinput0.5-693 -> data 0.5 -> grad 0.0]-->*225[*]
+    activation678457[activation678]-->weightinput1.0-678[weightinput1.0-678 -> data 1.0 -> grad -0.0]
+    ypred634[ypred634 -> data 0.6397830512740043 -> grad 1]-->loss656[loss]
+    weightinput2.0-634[weightinput2.0-634 -> data 2.0 -> grad 0.0]-->*165[*]
+    activation693620[activation693]-->weightinput1.0-693[weightinput1.0-693 -> data 1.0 -> grad -0.0]
+    weight520[weight520 -> data -0.23 -> grad 0.0]-->*445[*]
+    weight520[weight520 -> data -0.23 -> grad 0.0]-->*387[*]
+    weight520[weight520 -> data -0.23 -> grad 0.0]-->*405[*]
+    weight520[weight520 -> data -0.23 -> grad 0.0]-->*9[*]
+    activation678677[activation678]-->weightinput3.0-678[weightinput3.0-678 -> data 3.0 -> grad 0.0]
+    *387[*]-->activation678[activation678 -> data -0.3 -> grad 0]
+    activation212908[activation212]-->weightinput1.0-212[weightinput1.0-212 -> data 1.0 -> grad -0.0]
+    ypred212[ypred212 -> data 0.7716722471896521 -> grad 1]-->loss656[loss]
+    *750[*]-->activation212[activation212 -> data 0.6 -> grad 0]
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+```mermaid
+graph LR
+    weightinput3.0-393[weightinput3.0-393 -> data 3.0 -> grad 0]-->*500[*]
+    weightinput3.0-795[weightinput3.0-795 -> data 3.0 -> grad 0]-->*370[*]
+    add501[add501 -> data -0.15000000000000002 -> grad 0]-->tanh439[tanh]
+    *435[*]-->activation295[activation295 -> data 0.49 -> grad 0]
+    *654[*]-->activation732[activation732 -> data -0.4 -> grad 0]
+    *532[*]-->activation286[activation286 -> data -0.4 -> grad 0]
+    activation863651[activation863]-->weightinput2.0-863[weightinput2.0-863 -> data 2.0 -> grad 0]
+    *771[*]-->activation423[activation423 -> data 0.63 -> grad 0]
+    tanh88[tanh]-->tanh368[tanh368 -> data 0.3969304320050775 -> grad 0]
+    tanh982[tanh982 -> data -0.8321231362048838 -> grad 0]-->loss414[loss]
+    +576[+]-->add152[add152 -> data -0.5050000000000001 -> grad 0]
+    add399[add399 -> data -0.83 -> grad 0]-->tanh987[tanh]
+    +950[+]-->add286[add286 -> data -0.72 -> grad 0]
+    *317[*]-->activation234[activation234 -> data -0.63 -> grad 0]
+    *849[*]-->activation415[activation415 -> data -0.12 -> grad 0]
+    weightinput2.0-286[weightinput2.0-286 -> data 2.0 -> grad 0]-->*532[*]
+    *989[*]-->activation380[activation380 -> data 0.98 -> grad 0]
+    activation982953[activation982]-->weightinput1.0-982[weightinput1.0-982 -> data 1.0 -> grad 0]
+    *594[*]-->activation537[activation537 -> data 0.2 -> grad 0]
+    activation114294[activation114]-->weightinput0.5-114[weightinput0.5-114 -> data 0.5 -> grad 0]
+    *917[*]-->activation904[activation904 -> data 0.65 -> grad 0]
+    *276[*]-->activation698[activation698 -> data -0.65 -> grad 0]
+    *276[*]-->activation423[activation423 -> data 0.63 -> grad 0]
+    *46[*]-->activation152[activation152 -> data 0.43 -> grad 0]
+    +771[+]-->add788[add788 -> data 0.285 -> grad 0]
+    activation152[activation152 -> data 0.43 -> grad 0]-->+576[+]
+    weightinput0.5-295[weightinput0.5-295 -> data 0.5 -> grad 0]-->*252[*]
+    add863[add863 -> data -4.1899999999999995 -> grad 0]-->tanh674[tanh]
+    activation501245[activation501]-->weightinput1.0-501[weightinput1.0-501 -> data 1.0 -> grad 0]
+    activation732927[activation732]-->weightinput1.0-732[weightinput1.0-732 -> data 1.0 -> grad 0]
+    weightinput3.0-114[weightinput3.0-114 -> data 3.0 -> grad 0]-->*124[*]
+    activation170748[activation170]-->weightinput1.0-170[weightinput1.0-170 -> data 1.0 -> grad 0]
+    activation424806[activation424]-->weightinput0.5-424[weightinput0.5-424 -> data 0.5 -> grad 0]
+    *832[*]-->activation287[activation287 -> data -0.07 -> grad 0]
+    activation152455[activation152]-->weightinput0.5-152[weightinput0.5-152 -> data 0.5 -> grad 0]
+    activation732829[activation732]-->weightinput-1.0-732[weightinput-1.0-732 -> data -1.0 -> grad 0]
+    weightinput1.0-136[weightinput1.0-136 -> data 1.0 -> grad 0]-->*187[*]
+    weightinput1.0-136[weightinput1.0-136 -> data 1.0 -> grad 0]-->*883[*]
+    activation64917[activation649]-->weightinput1.0-649[weightinput1.0-649 -> data 1.0 -> grad 0]
+    weight168[weight168 -> data 0.96 -> grad 0]-->*500[*]
+    weight168[weight168 -> data 0.96 -> grad 0]-->*691[*]
+    weight168[weight168 -> data 0.96 -> grad 0]-->*276[*]
+    weight168[weight168 -> data 0.96 -> grad 0]-->*71[*]
+    *991[*]-->activation501[activation501 -> data -0.12 -> grad 0]
+    activation11827[activation118]-->weightinput3.0-118[weightinput3.0-118 -> data 3.0 -> grad 0]
+    activation354108[activation354]-->weightinput1.0-354[weightinput1.0-354 -> data 1.0 -> grad 0]
+    *108[*]-->activation286[activation286 -> data -0.4 -> grad 0]
+    +266[+]-->add415[add415 -> data -1.0100000000000002 -> grad 0]
+    tanh368[tanh368 -> data 0.3969304320050775 -> grad 0]-->loss414[loss]
+    bias30[bias30 -> data -0.56 -> grad 0]-->+426[+]
+    bias30[bias30 -> data -0.56 -> grad 0]-->+821[+]
+    bias30[bias30 -> data -0.56 -> grad 0]-->+801[+]
+    bias30[bias30 -> data -0.56 -> grad 0]-->+480[+]
+    *339[*]-->activation400[activation400 -> data 0.14 -> grad 0]
+    activation788[activation788 -> data -0.14 -> grad 0]-->+771[+]
+    activation170[activation170 -> data -0.68 -> grad 0]-->+480[+]
+    activation443[activation443 -> data 0.8 -> grad 0]-->+210[+]
+    weightinput1.0-698[weightinput1.0-698 -> data 1.0 -> grad 0]-->*276[*]
+    weightinput1.0-698[weightinput1.0-698 -> data 1.0 -> grad 0]-->*568[*]
+    weightinput3.0-982[weightinput3.0-982 -> data 3.0 -> grad 0]-->*797[*]
+    activation330949[activation330]-->weightinput0.5-330[weightinput0.5-330 -> data 0.5 -> grad 0]
+    weightinput0.5-788[weightinput0.5-788 -> data 0.5 -> grad 0]-->*78[*]
+    +434[+]-->add118[add118 -> data 2.045 -> grad 0]
+    weightinput3.0-443[weightinput3.0-443 -> data 3.0 -> grad 0]-->*439[*]
+    tanh891[tanh]-->tanh795[tanh795 -> data -0.9033247425601897 -> grad 0]
+    *444[*]-->activation904[activation904 -> data 0.65 -> grad 0]
+    activation380532[activation380]-->weightinput0.5-380[weightinput0.5-380 -> data 0.5 -> grad 0]
+    tanh336[tanh336 -> data 0.6291451614140355 -> grad 0]-->loss414[loss]
+    *958[*]-->activation208[activation208 -> data 0.8 -> grad 0]
+    *834[*]-->activation152[activation152 -> data 0.43 -> grad 0]
+    +662[+]-->add295[add295 -> data 2.34 -> grad 0]
+    add393[add393 -> data 3.52 -> grad 0]-->tanh841[tanh]
+    weightinput-1.0-863[weightinput-1.0-863 -> data -1.0 -> grad 0]-->*413[*]
+    tanh224[tanh]-->tanh423[tanh423 -> data 0.8763930674728228 -> grad 0]
+    activation234202[activation234]-->weightinput1.0-234[weightinput1.0-234 -> data 1.0 -> grad 0]
+    weight630[weight630 -> data 0.4 -> grad 0]-->*108[*]
+    weight630[weight630 -> data 0.4 -> grad 0]-->*799[*]
+    weight630[weight630 -> data 0.4 -> grad 0]-->*946[*]
+    weight630[weight630 -> data 0.4 -> grad 0]-->*654[*]
+    activation208[activation208 -> data 0.8 -> grad 0]-->+703[+]
+    activation732[activation732 -> data -0.4 -> grad 0]-->+613[+]
+    activation559484[activation559]-->weightinput-1.0-559[weightinput-1.0-559 -> data -1.0 -> grad 0]
+    *655[*]-->activation953[activation953 -> data 0.06 -> grad 0]
+    tanh250[tanh]-->tanh330[tanh330 -> data -0.9315516846152082 -> grad 0]
+    weight760[weight760 -> data -0.1 -> grad 0]-->*468[*]
+    weight760[weight760 -> data -0.1 -> grad 0]-->*422[*]
+    weight760[weight760 -> data -0.1 -> grad 0]-->*146[*]
+    weight760[weight760 -> data -0.1 -> grad 0]-->*951[*]
+    *739[*]-->activation393[activation393 -> data 0.65 -> grad 0]
+    weightinput0.5-982[weightinput0.5-982 -> data 0.5 -> grad 0]-->*733[*]
+    *691[*]-->activation649[activation649 -> data -0.325 -> grad 0]
+    tanh208[tanh208 -> data 0.8591265382143659 -> grad 0]-->loss414[loss]
+    weightinput1.0-423[weightinput1.0-423 -> data 1.0 -> grad 0]-->*276[*]
+    weightinput1.0-423[weightinput1.0-423 -> data 1.0 -> grad 0]-->*143[*]
+    activation912[activation912 -> data 0.4 -> grad 0]-->+3[+]
+    tanh234[tanh234 -> data 0.29131261245159096 -> grad 0]-->loss414[loss]
+    weightinput0.5-368[weightinput0.5-368 -> data 0.5 -> grad 0]-->*837[*]
+    tanh712[tanh712 -> data 0.282134812669634 -> grad 0]-->loss414[loss]
+    *280[*]-->activation698[activation698 -> data -0.65 -> grad 0]
+    weight456[weight456 -> data -0.65 -> grad 0]-->*739[*]
+    weight456[weight456 -> data -0.65 -> grad 0]-->*640[*]
+    weight456[weight456 -> data -0.65 -> grad 0]-->*568[*]
+    weight456[weight456 -> data -0.65 -> grad 0]-->*917[*]
+    activation712815[activation712]-->weightinput2.0-712[weightinput2.0-712 -> data 2.0 -> grad 0]
+    activation649191[activation649]-->weightinput0.5-649[weightinput0.5-649 -> data 0.5 -> grad 0]
+    *647[*]-->activation712[activation712 -> data -0.98 -> grad 0]
+    weightinput1.0-368[weightinput1.0-368 -> data 1.0 -> grad 0]-->*146[*]
+    weightinput1.0-368[weightinput1.0-368 -> data 1.0 -> grad 0]-->*224[*]
+    activation330338[activation330]-->weightinput3.0-330[weightinput3.0-330 -> data 3.0 -> grad 0]
+    activation795654[activation795]-->weightinput3.0-795[weightinput3.0-795 -> data 3.0 -> grad 0]
+    weight258[weight258 -> data 0.02 -> grad 0]-->*775[*]
+    weight258[weight258 -> data 0.02 -> grad 0]-->*365[*]
+    weight258[weight258 -> data 0.02 -> grad 0]-->*276[*]
+    weight258[weight258 -> data 0.02 -> grad 0]-->*840[*]
+    activation295[activation295 -> data 0.49 -> grad 0]-->+662[+]
+    activation354[activation354 -> data -0.43 -> grad 0]-->+250[+]
+    weightinput0.5-399[weightinput0.5-399 -> data 0.5 -> grad 0]-->*536[*]
+    activation380[activation380 -> data 0.98 -> grad 0]-->+397[+]
+    activation118390[activation118]-->weightinput0.5-118[weightinput0.5-118 -> data 0.5 -> grad 0]
+    *733[*]-->activation982[activation982 -> data 0.215 -> grad 0]
+    activation904416[activation904]-->weightinput1.0-904[weightinput1.0-904 -> data 1.0 -> grad 0]
+    +128[+]-->add424[add424 -> data 0.029999999999999916 -> grad 0]
+    *270[*]-->activation330[activation330 -> data 0.34 -> grad 0]
+    weight275[weight275 -> data 0.04 -> grad 0]-->*647[*]
+    weight275[weight275 -> data 0.04 -> grad 0]-->*218[*]
+    weight275[weight275 -> data 0.04 -> grad 0]-->*535[*]
+    weight275[weight275 -> data 0.04 -> grad 0]-->*883[*]
+    *439[*]-->activation443[activation443 -> data 0.8 -> grad 0]
+    activation208734[activation208]-->weightinput-1.0-208[weightinput-1.0-208 -> data -1.0 -> grad 0]
+    weightinput0.5-330[weightinput0.5-330 -> data 0.5 -> grad 0]-->*31[*]
+    bias826[bias826 -> data 0.29 -> grad 0]-->+137[+]
+    bias826[bias826 -> data 0.29 -> grad 0]-->+122[+]
+    bias826[bias826 -> data 0.29 -> grad 0]-->+180[+]
+    bias826[bias826 -> data 0.29 -> grad 0]-->+532[+]
+    tanh119[tanh]-->tanh788[tanh788 -> data 0.2775263502976838 -> grad 0]
+    +821[+]-->add330[add330 -> data -1.6700000000000002 -> grad 0]
+    *500[*]-->activation393[activation393 -> data 0.65 -> grad 0]
+    activation287[activation287 -> data -0.07 -> grad 0]-->+778[+]
+    add114[add114 -> data -1.27 -> grad 0]-->tanh381[tanh]
+    *735[*]-->activation732[activation732 -> data -0.4 -> grad 0]
+    tanh399[tanh399 -> data -0.6804760061126619 -> grad 0]-->loss414[loss]
+    tanh424[tanh424 -> data 0.029991003238820046 -> grad 0]-->loss414[loss]
+    *316[*]-->activation208[activation208 -> data 0.8 -> grad 0]
+    weightinput-1.0-904[weightinput-1.0-904 -> data -1.0 -> grad 0]-->*917[*]
+    tanh841[tanh]-->tanh393[tanh393 -> data 0.9982492807271415 -> grad 0]
+    tanh238[tanh]-->tanh208[tanh208 -> data 0.8591265382143659 -> grad 0]
+    *26[*]-->activation424[activation424 -> data -0.8 -> grad 0]
+    activation295176[activation295]-->weightinput1.0-295[weightinput1.0-295 -> data 1.0 -> grad 0]
+    tanh941[tanh]-->tanh286[tanh286 -> data -0.616909302877065 -> grad 0]
+    activation712[activation712 -> data -0.98 -> grad 0]-->+816[+]
+    tanh987[tanh]-->tanh399[tanh399 -> data -0.6804760061126619 -> grad 0]
+    activation368[activation368 -> data 0.12 -> grad 0]-->+966[+]
+    add118[add118 -> data 2.045 -> grad 0]-->tanh447[tanh]
+    +426[+]-->add863[add863 -> data -4.1899999999999995 -> grad 0]
+    weight748[weight748 -> data -0.15 -> grad 0]-->*517[*]
+    weight748[weight748 -> data -0.15 -> grad 0]-->*68[*]
+    weight748[weight748 -> data -0.15 -> grad 0]-->*280[*]
+    weight748[weight748 -> data -0.15 -> grad 0]-->*444[*]
+    weightinput1.0-953[weightinput1.0-953 -> data 1.0 -> grad 0]-->*422[*]
+    *740[*]-->activation982[activation982 -> data 0.215 -> grad 0]
+    *39[*]-->activation400[activation400 -> data 0.14 -> grad 0]
+    weightinput-1.0-559[weightinput-1.0-559 -> data -1.0 -> grad 0]-->*482[*]
+    activation559[activation559 -> data 0.14 -> grad 0]-->+228[+]
+    activation399825[activation399]-->weightinput0.5-399[weightinput0.5-399 -> data 0.5 -> grad 0]
+    activation393270[activation393]-->weightinput-1.0-393[weightinput-1.0-393 -> data -1.0 -> grad 0]
+    tanh328[tanh]-->tanh170[tanh170 -> data -0.9796983982280146 -> grad 0]
+    activation330[activation330 -> data 0.34 -> grad 0]-->+821[+]
+    activation380182[activation380]-->weightinput1.0-380[weightinput1.0-380 -> data 1.0 -> grad 0]
+    activation170199[activation170]-->weightinput-1.0-170[weightinput-1.0-170 -> data -1.0 -> grad 0]
+    weightinput1.0-424[weightinput1.0-424 -> data 1.0 -> grad 0]-->*26[*]
+    weightinput1.0-424[weightinput1.0-424 -> data 1.0 -> grad 0]-->*962[*]
+    tanh986[tanh]-->tanh234[tanh234 -> data 0.29131261245159096 -> grad 0]
+    activation953394[activation953]-->weightinput1.0-953[weightinput1.0-953 -> data 1.0 -> grad 0]
+    weight781[weight781 -> data -0.66 -> grad 0]-->*245[*]
+    weight781[weight781 -> data -0.66 -> grad 0]-->*655[*]
+    weight781[weight781 -> data -0.66 -> grad 0]-->*837[*]
+    weight781[weight781 -> data -0.66 -> grad 0]-->*991[*]
+    weightinput-1.0-286[weightinput-1.0-286 -> data -1.0 -> grad 0]-->*108[*]
+    activation368629[activation368]-->weightinput1.0-368[weightinput1.0-368 -> data 1.0 -> grad 0]
+    *536[*]-->activation399[activation399 -> data 0.68 -> grad 0]
+    *224[*]-->activation368[activation368 -> data 0.12 -> grad 0]
+    *207[*]-->activation118[activation118 -> data 0.315 -> grad 0]
+    *840[*]-->activation234[activation234 -> data -0.63 -> grad 0]
+    activation649[activation649 -> data -0.325 -> grad 0]-->+122[+]
+    weightinput3.0-649[weightinput3.0-649 -> data 3.0 -> grad 0]-->*68[*]
+    weight736[weight736 -> data 0.66 -> grad 0]-->*71[*]
+    weight736[weight736 -> data 0.66 -> grad 0]-->*435[*]
+    weight736[weight736 -> data 0.66 -> grad 0]-->*989[*]
+    weight736[weight736 -> data 0.66 -> grad 0]-->*187[*]
+    weight852[weight852 -> data 0.08 -> grad 0]-->*370[*]
+    weight852[weight852 -> data 0.08 -> grad 0]-->*740[*]
+    weight852[weight852 -> data 0.08 -> grad 0]-->*7[*]
+    weight852[weight852 -> data 0.08 -> grad 0]-->*874[*]
+    *517[*]-->activation393[activation393 -> data 0.65 -> grad 0]
+    *993[*]-->activation286[activation286 -> data -0.4 -> grad 0]
+    +699[+]-->add136[add136 -> data -0.44999999999999996 -> grad 0]
+    *7[*]-->activation152[activation152 -> data 0.43 -> grad 0]
+    tanh692[tanh]-->tanh559[tanh559 -> data 0.7352222529158693 -> grad 0]
+    weightinput-1.0-136[weightinput-1.0-136 -> data -1.0 -> grad 0]-->*947[*]
+    activation114988[activation114]-->weightinput1.0-114[weightinput1.0-114 -> data 1.0 -> grad 0]
+    activation423644[activation423]-->weightinput0.5-423[weightinput0.5-423 -> data 0.5 -> grad 0]
+    +3[+]-->add912[add912 -> data 0.26 -> grad 0]
+    weightinput3.0-336[weightinput3.0-336 -> data 3.0 -> grad 0]-->*775[*]
+    weight755[weight755 -> data -0.68 -> grad 0]-->*690[*]
+    weight755[weight755 -> data -0.68 -> grad 0]-->*124[*]
+    weight755[weight755 -> data -0.68 -> grad 0]-->*565[*]
+    weight755[weight755 -> data -0.68 -> grad 0]-->*316[*]
+    tanh537[tanh537 -> data -0.13909244787845804 -> grad 0]-->loss414[loss]
+    *173[*]-->activation443[activation443 -> data 0.8 -> grad 0]
+    *874[*]-->activation354[activation354 -> data -0.43 -> grad 0]
+    *70[*]-->activation399[activation399 -> data 0.68 -> grad 0]
+    weightinput1.0-788[weightinput1.0-788 -> data 1.0 -> grad 0]-->*697[*]
+    weightinput1.0-788[weightinput1.0-788 -> data 1.0 -> grad 0]-->*925[*]
+    tanh578[tanh]-->tanh287[tanh287 -> data 0.9771395937470585 -> grad 0]
+    add912[add912 -> data 0.26 -> grad 0]-->tanh646[tanh]
+    weight221[weight221 -> data -0.8 -> grad 0]-->*173[*]
+    weight221[weight221 -> data -0.8 -> grad 0]-->*370[*]
+    weight221[weight221 -> data -0.8 -> grad 0]-->*962[*]
+    weight221[weight221 -> data -0.8 -> grad 0]-->*958[*]
+    activation953[activation953 -> data 0.06 -> grad 0]-->+852[+]
+    activation336717[activation336]-->weightinput-1.0-336[weightinput-1.0-336 -> data -1.0 -> grad 0]
+    activation336111[activation336]-->weightinput2.0-336[weightinput2.0-336 -> data 2.0 -> grad 0]
+    +493[+]-->add400[add400 -> data 1.03 -> grad 0]
+    activation234[activation234 -> data -0.63 -> grad 0]-->+781[+]
+    tanh999[tanh]-->tanh136[tanh136 -> data -0.42189900525000784 -> grad 0]
+    *475[*]-->activation912[activation912 -> data 0.4 -> grad 0]
+    +480[+]-->add170[add170 -> data -2.29 -> grad 0]
+    +801[+]-->add399[add399 -> data -0.83 -> grad 0]
+    activation415[activation415 -> data -0.12 -> grad 0]-->+266[+]
+    bias787[bias787 -> data -0.92 -> grad 0]-->+673[+]
+    bias787[bias787 -> data -0.92 -> grad 0]-->+302[+]
+    bias787[bias787 -> data -0.92 -> grad 0]-->+576[+]
+    bias787[bias787 -> data -0.92 -> grad 0]-->+250[+]
+    *902[*]-->activation795[activation795 -> data -0.43 -> grad 0]
+    weightinput2.0-400[weightinput2.0-400 -> data 2.0 -> grad 0]-->*339[*]
+    +966[+]-->add368[add368 -> data 0.41999999999999993 -> grad 0]
+    weightinput1.0-501[weightinput1.0-501 -> data 1.0 -> grad 0]-->*991[*]
+    weightinput1.0-501[weightinput1.0-501 -> data 1.0 -> grad 0]-->*951[*]
+    tanh579[tanh]-->tanh295[tanh295 -> data 0.9816125892654238 -> grad 0]
+    *565[*]-->activation424[activation424 -> data -0.8 -> grad 0]
+    *58[*]-->activation330[activation330 -> data 0.34 -> grad 0]
+    *58[*]-->activation953[activation953 -> data 0.06 -> grad 0]
+    *468[*]-->activation415[activation415 -> data -0.12 -> grad 0]
+    bias656[bias656 -> data 0.38 -> grad 0]-->+493[+]
+    bias656[bias656 -> data 0.38 -> grad 0]-->+778[+]
+    bias656[bias656 -> data 0.38 -> grad 0]-->+771[+]
+    bias656[bias656 -> data 0.38 -> grad 0]-->+228[+]
+    weightinput-1.0-443[weightinput-1.0-443 -> data -1.0 -> grad 0]-->*173[*]
+    +781[+]-->add234[add234 -> data 0.30000000000000004 -> grad 0]
+    *883[*]-->activation136[activation136 -> data -0.98 -> grad 0]
+    activation393[activation393 -> data 0.65 -> grad 0]-->+137[+]
+    weight457[weight457 -> data -0.08 -> grad 0]-->*532[*]
+    weight457[weight457 -> data -0.08 -> grad 0]-->*594[*]
+    weight457[weight457 -> data -0.08 -> grad 0]-->*475[*]
+    weight457[weight457 -> data -0.08 -> grad 0]-->*180[*]
+    activation152904[activation152]-->weightinput1.0-152[weightinput1.0-152 -> data 1.0 -> grad 0]
+    weight672[weight672 -> data -0.19 -> grad 0]-->*506[*]
+    weight672[weight672 -> data -0.19 -> grad 0]-->*797[*]
+    weight672[weight672 -> data -0.19 -> grad 0]-->*834[*]
+    weight672[weight672 -> data -0.19 -> grad 0]-->*997[*]
+    activation393662[activation393]-->weightinput2.0-393[weightinput2.0-393 -> data 2.0 -> grad 0]
+    activation287200[activation287]-->weightinput1.0-287[weightinput1.0-287 -> data 1.0 -> grad 0]
+    tanh188[tanh]-->tanh953[tanh953 -> data -0.8591265382143659 -> grad 0]
+    weight903[weight903 -> data -0.33 -> grad 0]-->*39[*]
+    weight903[weight903 -> data -0.33 -> grad 0]-->*953[*]
+    weight903[weight903 -> data -0.33 -> grad 0]-->*697[*]
+    weight903[weight903 -> data -0.33 -> grad 0]-->*528[*]
+    add953[add953 -> data -1.29 -> grad 0]-->tanh188[tanh]
+    activation649418[activation649]-->weightinput3.0-649[weightinput3.0-649 -> data 3.0 -> grad 0]
+    activation795545[activation795]-->weightinput-1.0-795[weightinput-1.0-795 -> data -1.0 -> grad 0]
+    *370[*]-->activation795[activation795 -> data -0.43 -> grad 0]
+    *370[*]-->activation114[activation114 -> data -0.4 -> grad 0]
+    *180[*]-->activation732[activation732 -> data -0.4 -> grad 0]
+    add732[add732 -> data -0.5800000000000001 -> grad 0]-->tanh154[tanh]
+    activation953615[activation953]-->weightinput3.0-953[weightinput3.0-953 -> data 3.0 -> grad 0]
+    *428[*]-->activation170[activation170 -> data -0.68 -> grad 0]
+    weightinput1.0-330[weightinput1.0-330 -> data 1.0 -> grad 0]-->*270[*]
+    tanh295[tanh295 -> data 0.9816125892654238 -> grad 0]-->loss414[loss]
+    *508[*]-->activation170[activation170 -> data -0.68 -> grad 0]
+    weightinput0.5-912[weightinput0.5-912 -> data 0.5 -> grad 0]-->*475[*]
+    weightinput3.0-953[weightinput3.0-953 -> data 3.0 -> grad 0]-->*655[*]
+    weightinput0.5-537[weightinput0.5-537 -> data 0.5 -> grad 0]-->*799[*]
+    weightinput0.5-118[weightinput0.5-118 -> data 0.5 -> grad 0]-->*245[*]
+    *78[*]-->activation788[activation788 -> data -0.14 -> grad 0]
+    activation904[activation904 -> data 0.65 -> grad 0]-->+532[+]
+    add136[add136 -> data -0.44999999999999996 -> grad 0]-->tanh999[tanh]
+    *697[*]-->activation788[activation788 -> data -0.14 -> grad 0]
+    weightinput0.5-423[weightinput0.5-423 -> data 0.5 -> grad 0]-->*771[*]
+    weightinput0.5-698[weightinput0.5-698 -> data 0.5 -> grad 0]-->*280[*]
+    add904[add904 -> data 1.75 -> grad 0]-->tanh526[tanh]
+    tanh351[tanh]-->tanh152[tanh152 -> data -0.4660402984777153 -> grad 0]
+    add443[add443 -> data 2.07 -> grad 0]-->tanh299[tanh]
+    activation114[activation114 -> data -0.4 -> grad 0]-->+379[+]
+    *496[*]-->activation400[activation400 -> data 0.14 -> grad 0]
+    bias54[bias54 -> data -0.17 -> grad 0]-->+816[+]
+    bias54[bias54 -> data -0.17 -> grad 0]-->+662[+]
+    bias54[bias54 -> data -0.17 -> grad 0]-->+397[+]
+    bias54[bias54 -> data -0.17 -> grad 0]-->+699[+]
+    *855[*]-->activation399[activation399 -> data 0.68 -> grad 0]
+    weightinput1.0-904[weightinput1.0-904 -> data 1.0 -> grad 0]-->*444[*]
+    weightinput1.0-904[weightinput1.0-904 -> data 1.0 -> grad 0]-->*71[*]
+    *528[*]-->activation559[activation559 -> data 0.14 -> grad 0]
+    activation380305[activation380]-->weightinput1.0-380[weightinput1.0-380 -> data 1.0 -> grad 0]
+    +379[+]-->add114[add114 -> data -1.27 -> grad 0]
+    weightinput-1.0-795[weightinput-1.0-795 -> data -1.0 -> grad 0]-->*902[*]
+    weight577[weight577 -> data 0.43 -> grad 0]-->*902[*]
+    weight577[weight577 -> data 0.43 -> grad 0]-->*733[*]
+    weight577[weight577 -> data 0.43 -> grad 0]-->*46[*]
+    weight577[weight577 -> data 0.43 -> grad 0]-->*676[*]
+    tanh165[tanh]-->tanh354[tanh354 -> data -0.8976525981658168 -> grad 0]
+    bias415[bias415 -> data 0.51 -> grad 0]-->+507[+]
+    bias415[bias415 -> data 0.51 -> grad 0]-->+434[+]
+    bias415[bias415 -> data 0.51 -> grad 0]-->+387[+]
+    bias415[bias415 -> data 0.51 -> grad 0]-->+781[+]
+    weightinput0.5-287[weightinput0.5-287 -> data 0.5 -> grad 0]-->*832[*]
+    bias795[bias795 -> data 0.44 -> grad 0]-->+210[+]
+    bias795[bias795 -> data 0.44 -> grad 0]-->+379[+]
+    bias795[bias795 -> data 0.44 -> grad 0]-->+128[+]
+    bias795[bias795 -> data 0.44 -> grad 0]-->+703[+]
+    *290[*]-->activation380[activation380 -> data 0.98 -> grad 0]
+    activation286657[activation286]-->weightinput2.0-286[weightinput2.0-286 -> data 2.0 -> grad 0]
+    tanh380[tanh380 -> data 0.8274516110081667 -> grad 0]-->loss414[loss]
+    weight321[weight321 -> data 0.63 -> grad 0]-->*221[*]
+    weight321[weight321 -> data 0.63 -> grad 0]-->*245[*]
+    weight321[weight321 -> data 0.63 -> grad 0]-->*143[*]
+    weight321[weight321 -> data 0.63 -> grad 0]-->*355[*]
+    activation286[activation286 -> data -0.4 -> grad 0]-->+950[+]
+    *953[*]-->activation287[activation287 -> data -0.07 -> grad 0]
+    tanh400[tanh400 -> data 0.7739083398558421 -> grad 0]-->loss414[loss]
+    tanh526[tanh]-->tanh904[tanh904 -> data 0.9413755384972874 -> grad 0]
+    *218[*]-->activation295[activation295 -> data 0.49 -> grad 0]
+    weightinput1.0-114[weightinput1.0-114 -> data 1.0 -> grad 0]-->*406[*]
+    +387[+]-->add423[add423 -> data 1.3599999999999999 -> grad 0]
+    +122[+]-->add649[add649 -> data 0.475 -> grad 0]
+    activation170189[activation170]-->weightinput1.0-170[weightinput1.0-170 -> data 1.0 -> grad 0]
+    *23[*]-->activation208[activation208 -> data 0.8 -> grad 0]
+    activation423[activation423 -> data 0.63 -> grad 0]-->+387[+]
+    activation399893[activation399]-->weightinput1.0-399[weightinput1.0-399 -> data 1.0 -> grad 0]
+    *365[*]-->activation118[activation118 -> data 0.315 -> grad 0]
+    activation953908[activation953]-->weightinput0.5-953[weightinput0.5-953 -> data 0.5 -> grad 0]
+    *525[*]-->activation863[activation863 -> data -0.68 -> grad 0]
+    tanh136[tanh136 -> data -0.42189900525000784 -> grad 0]-->loss414[loss]
+    *640[*]-->activation649[activation649 -> data -0.325 -> grad 0]
+    *221[*]-->activation336[activation336 -> data -0.63 -> grad 0]
+    weightinput2.0-443[weightinput2.0-443 -> data 2.0 -> grad 0]-->*690[*]
+    add368[add368 -> data 0.41999999999999993 -> grad 0]-->tanh88[tanh]
+    weightinput1.0-287[weightinput1.0-287 -> data 1.0 -> grad 0]-->*953[*]
+    activation424[activation424 -> data -0.8 -> grad 0]-->+128[+]
+    activation400998[activation400]-->weightinput2.0-400[weightinput2.0-400 -> data 2.0 -> grad 0]
+    weightinput-1.0-234[weightinput-1.0-234 -> data -1.0 -> grad 0]-->*355[*]
+    tanh649[tanh649 -> data 0.44223035604572614 -> grad 0]-->loss414[loss]
+    *799[*]-->activation537[activation537 -> data 0.2 -> grad 0]
+    tanh863[tanh863 -> data -0.9995412853427936 -> grad 0]-->loss414[loss]
+    tanh904[tanh904 -> data 0.9413755384972874 -> grad 0]-->loss414[loss]
+    tanh114[tanh114 -> data -0.8537976531552437 -> grad 0]-->loss414[loss]
+    tanh354[tanh354 -> data -0.8976525981658168 -> grad 0]-->loss414[loss]
+    activation118[activation118 -> data 0.315 -> grad 0]-->+434[+]
+    *797[*]-->activation982[activation982 -> data 0.215 -> grad 0]
+    weightinput1.0-170[weightinput1.0-170 -> data 1.0 -> grad 0]-->*508[*]
+    weightinput1.0-170[weightinput1.0-170 -> data 1.0 -> grad 0]-->*428[*]
+    activation982[activation982 -> data 0.215 -> grad 0]-->+302[+]
+    activation863261[activation863]-->weightinput3.0-863[weightinput3.0-863 -> data 3.0 -> grad 0]
+    activation423472[activation423]-->weightinput1.0-423[weightinput1.0-423 -> data 1.0 -> grad 0]
+    tanh447[tanh]-->tanh118[tanh118 -> data 0.9670727104726874 -> grad 0]
+    add788[add788 -> data 0.285 -> grad 0]-->tanh119[tanh]
+    activation698922[activation698]-->weightinput1.0-698[weightinput1.0-698 -> data 1.0 -> grad 0]
+    *494[*]-->activation912[activation912 -> data 0.4 -> grad 0]
+    weightinput0.5-114[weightinput0.5-114 -> data 0.5 -> grad 0]-->*370[*]
+    tanh716[tanh]-->tanh336[tanh336 -> data 0.6291451614140355 -> grad 0]
+    *124[*]-->activation114[activation114 -> data -0.4 -> grad 0]
+    weight55[weight55 -> data 0.73 -> grad 0]-->*439[*]
+    weight55[weight55 -> data 0.73 -> grad 0]-->*406[*]
+    weight55[weight55 -> data 0.73 -> grad 0]-->*26[*]
+    weight55[weight55 -> data 0.73 -> grad 0]-->*23[*]
+    weight151[weight151 -> data -0.14 -> grad 0]-->*496[*]
+    weight151[weight151 -> data -0.14 -> grad 0]-->*832[*]
+    weight151[weight151 -> data -0.14 -> grad 0]-->*925[*]
+    weight151[weight151 -> data -0.14 -> grad 0]-->*482[*]
+    *71[*]-->activation712[activation712 -> data -0.98 -> grad 0]
+    *71[*]-->activation904[activation904 -> data 0.65 -> grad 0]
+    tanh152[tanh152 -> data -0.4660402984777153 -> grad 0]-->loss414[loss]
+    weightinput3.0-537[weightinput3.0-537 -> data 3.0 -> grad 0]-->*594[*]
+    activation400[activation400 -> data 0.14 -> grad 0]-->+493[+]
+    activation399886[activation399]-->weightinput1.0-399[weightinput1.0-399 -> data 1.0 -> grad 0]
+    tanh393[tanh393 -> data 0.9982492807271415 -> grad 0]-->loss414[loss]
+    weightinput-1.0-354[weightinput-1.0-354 -> data -1.0 -> grad 0]-->*676[*]
+    activation393613[activation393]-->weightinput3.0-393[weightinput3.0-393 -> data 3.0 -> grad 0]
+    activation354448[activation354]-->weightinput1.0-354[weightinput1.0-354 -> data 1.0 -> grad 0]
+    tanh299[tanh]-->tanh443[tanh443 -> data 0.9686534238679029 -> grad 0]
+    activation501[activation501 -> data -0.12 -> grad 0]-->+953[+]
+    *274[*]-->activation537[activation537 -> data 0.2 -> grad 0]
+    activation559519[activation559]-->weightinput1.0-559[weightinput1.0-559 -> data 1.0 -> grad 0]
+    add170[add170 -> data -2.29 -> grad 0]-->tanh328[tanh]
+    activation368706[activation368]-->weightinput1.0-368[weightinput1.0-368 -> data 1.0 -> grad 0]
+    *422[*]-->activation953[activation953 -> data 0.06 -> grad 0]
+    *951[*]-->activation501[activation501 -> data -0.12 -> grad 0]
+    tanh698[tanh698 -> data 0.48154979836430795 -> grad 0]-->loss414[loss]
+    tanh559[tanh559 -> data 0.7352222529158693 -> grad 0]-->loss414[loss]
+    activation698103[activation698]-->weightinput0.5-698[weightinput0.5-698 -> data 0.5 -> grad 0]
+    weightinput2.0-712[weightinput2.0-712 -> data 2.0 -> grad 0]-->*71[*]
+    activation501898[activation501]-->weightinput-1.0-501[weightinput-1.0-501 -> data -1.0 -> grad 0]
+    weightinput1.0-912[weightinput1.0-912 -> data 1.0 -> grad 0]-->*494[*]
+    weightinput1.0-912[weightinput1.0-912 -> data 1.0 -> grad 0]-->*946[*]
+    activation399[activation399 -> data 0.68 -> grad 0]-->+801[+]
+    *997[*]-->activation354[activation354 -> data -0.43 -> grad 0]
+    *775[*]-->activation336[activation336 -> data -0.63 -> grad 0]
+    tanh795[tanh795 -> data -0.9033247425601897 -> grad 0]-->loss414[loss]
+    add982[add982 -> data -1.195 -> grad 0]-->tanh866[tanh]
+    *31[*]-->activation330[activation330 -> data 0.34 -> grad 0]
+    tanh434[tanh]-->tanh380[tanh380 -> data 0.8274516110081667 -> grad 0]
+    +137[+]-->add393[add393 -> data 3.52 -> grad 0]
+    weightinput0.5-152[weightinput0.5-152 -> data 0.5 -> grad 0]-->*834[*]
+    weightinput1.0-537[weightinput1.0-537 -> data 1.0 -> grad 0]-->*274[*]
+    activation114491[activation114]-->weightinput3.0-114[weightinput3.0-114 -> data 3.0 -> grad 0]
+    add234[add234 -> data 0.30000000000000004 -> grad 0]-->tanh986[tanh]
+    activation501615[activation501]-->weightinput1.0-501[weightinput1.0-501 -> data 1.0 -> grad 0]
+    activation208642[activation208]-->weightinput1.0-208[weightinput1.0-208 -> data 1.0 -> grad 0]
+    tanh286[tanh286 -> data -0.616909302877065 -> grad 0]-->loss414[loss]
+    activation295888[activation295]-->weightinput0.5-295[weightinput0.5-295 -> data 0.5 -> grad 0]
+    weight665[weight665 -> data 0.98 -> grad 0]-->*837[*]
+    weight665[weight665 -> data 0.98 -> grad 0]-->*252[*]
+    weight665[weight665 -> data 0.98 -> grad 0]-->*290[*]
+    weight665[weight665 -> data 0.98 -> grad 0]-->*947[*]
+    add330[add330 -> data -1.6700000000000002 -> grad 0]-->tanh250[tanh]
+    activation234294[activation234]-->weightinput-1.0-234[weightinput-1.0-234 -> data -1.0 -> grad 0]
+    activation982979[activation982]-->weightinput0.5-982[weightinput0.5-982 -> data 0.5 -> grad 0]
+    weightinput-1.0-400[weightinput-1.0-400 -> data -1.0 -> grad 0]-->*496[*]
+    tanh443[tanh443 -> data 0.9686534238679029 -> grad 0]-->loss414[loss]
+    activation368396[activation368]-->weightinput0.5-368[weightinput0.5-368 -> data 0.5 -> grad 0]
+    tanh118[tanh118 -> data 0.9670727104726874 -> grad 0]-->loss414[loss]
+    +180[+]-->add698[add698 -> data 0.5249999999999999 -> grad 0]
+    activation354382[activation354]-->weightinput-1.0-354[weightinput-1.0-354 -> data -1.0 -> grad 0]
+    add423[add423 -> data 1.3599999999999999 -> grad 0]-->tanh224[tanh]
+    activation912713[activation912]-->weightinput1.0-912[weightinput1.0-912 -> data 1.0 -> grad 0]
+    weightinput-1.0-336[weightinput-1.0-336 -> data -1.0 -> grad 0]-->*221[*]
+    +778[+]-->add287[add287 -> data 2.23 -> grad 0]
+    +703[+]-->add208[add208 -> data 1.29 -> grad 0]
+    *672[*]-->activation336[activation336 -> data -0.63 -> grad 0]
+    bias751[bias751 -> data -0.07 -> grad 0]-->+950[+]
+    bias751[bias751 -> data -0.07 -> grad 0]-->+535[+]
+    bias751[bias751 -> data -0.07 -> grad 0]-->+3[+]
+    bias751[bias751 -> data -0.07 -> grad 0]-->+613[+]
+    *389[*]-->activation863[activation863 -> data -0.68 -> grad 0]
+    weightinput-1.0-170[weightinput-1.0-170 -> data -1.0 -> grad 0]-->*898[*]
+    add537[add537 -> data -0.14 -> grad 0]-->tanh719[tanh]
+    weight247[weight247 -> data 0.4 -> grad 0]-->*672[*]
+    weight247[weight247 -> data 0.4 -> grad 0]-->*207[*]
+    weight247[weight247 -> data 0.4 -> grad 0]-->*771[*]
+    weight247[weight247 -> data 0.4 -> grad 0]-->*317[*]
+    weight869[weight869 -> data -0.85 -> grad 0]-->*389[*]
+    weight869[weight869 -> data -0.85 -> grad 0]-->*270[*]
+    weight869[weight869 -> data -0.85 -> grad 0]-->*855[*]
+    weight869[weight869 -> data -0.85 -> grad 0]-->*428[*]
+    add424[add424 -> data 0.029999999999999916 -> grad 0]-->tanh625[tanh]
+    weight597[weight597 -> data -0.03 -> grad 0]-->*993[*]
+    weight597[weight597 -> data -0.03 -> grad 0]-->*274[*]
+    weight597[weight597 -> data -0.03 -> grad 0]-->*494[*]
+    weight597[weight597 -> data -0.03 -> grad 0]-->*735[*]
+    add295[add295 -> data 2.34 -> grad 0]-->tanh579[tanh]
+    weightinput1.0-295[weightinput1.0-295 -> data 1.0 -> grad 0]-->*218[*]
+    activation286354[activation286]-->weightinput-1.0-286[weightinput-1.0-286 -> data -1.0 -> grad 0]
+    +613[+]-->add732[add732 -> data -0.5800000000000001 -> grad 0]
+    *947[*]-->activation136[activation136 -> data -0.98 -> grad 0]
+    *535[*]-->activation380[activation380 -> data 0.98 -> grad 0]
+    *925[*]-->activation788[activation788 -> data -0.14 -> grad 0]
+    activation423457[activation423]-->weightinput1.0-423[weightinput1.0-423 -> data 1.0 -> grad 0]
+    weightinput1.0-380[weightinput1.0-380 -> data 1.0 -> grad 0]-->*535[*]
+    weightinput1.0-380[weightinput1.0-380 -> data 1.0 -> grad 0]-->*290[*]
+    activation712383[activation712]-->weightinput3.0-712[weightinput3.0-712 -> data 3.0 -> grad 0]
+    activation537[activation537 -> data 0.2 -> grad 0]-->+535[+]
+    add415[add415 -> data -1.0100000000000002 -> grad 0]-->tanh535[tanh]
+    weightinput3.0-286[weightinput3.0-286 -> data 3.0 -> grad 0]-->*993[*]
+    *355[*]-->activation234[activation234 -> data -0.63 -> grad 0]
+    activation136454[activation136]-->weightinput-1.0-136[weightinput-1.0-136 -> data -1.0 -> grad 0]
+    activation4249[activation424]-->weightinput1.0-424[weightinput1.0-424 -> data 1.0 -> grad 0]
+    tanh381[tanh]-->tanh114[tanh114 -> data -0.8537976531552437 -> grad 0]
+    weightinput-1.0-393[weightinput-1.0-393 -> data -1.0 -> grad 0]-->*739[*]
+    tanh995[tanh]-->tanh698[tanh698 -> data 0.48154979836430795 -> grad 0]
+    activation537994[activation537]-->weightinput3.0-537[weightinput3.0-537 -> data 3.0 -> grad 0]
+    weightinput2.0-795[weightinput2.0-795 -> data 2.0 -> grad 0]-->*506[*]
+    weightinput3.0-400[weightinput3.0-400 -> data 3.0 -> grad 0]-->*39[*]
+    *690[*]-->activation443[activation443 -> data 0.8 -> grad 0]
+    *837[*]-->activation712[activation712 -> data -0.98 -> grad 0]
+    *837[*]-->activation368[activation368 -> data 0.12 -> grad 0]
+    tanh535[tanh]-->tanh415[tanh415 -> data -0.7657620182484389 -> grad 0]
+    tanh953[tanh953 -> data -0.8591265382143659 -> grad 0]-->loss414[loss]
+    *153[*]-->activation287[activation287 -> data -0.07 -> grad 0]
+    weightinput-1.0-501[weightinput-1.0-501 -> data -1.0 -> grad 0]-->*994[*]
+    weightinput1.0-399[weightinput1.0-399 -> data 1.0 -> grad 0]-->*855[*]
+    weightinput1.0-399[weightinput1.0-399 -> data 1.0 -> grad 0]-->*70[*]
+    *413[*]-->activation863[activation863 -> data -0.68 -> grad 0]
+    weightinput-1.0-208[weightinput-1.0-208 -> data -1.0 -> grad 0]-->*958[*]
+    weightinput1.0-982[weightinput1.0-982 -> data 1.0 -> grad 0]-->*740[*]
+    activation415822[activation415]-->weightinput-1.0-415[weightinput-1.0-415 -> data -1.0 -> grad 0]
+    add287[add287 -> data 2.23 -> grad 0]-->tanh578[tanh]
+    activation788182[activation788]-->weightinput0.5-788[weightinput0.5-788 -> data 0.5 -> grad 0]
+    tanh415[tanh415 -> data -0.7657620182484389 -> grad 0]-->loss414[loss]
+    tanh83[tanh]-->tanh400[tanh400 -> data 0.7739083398558421 -> grad 0]
+    activation698[activation698 -> data -0.65 -> grad 0]-->+180[+]
+    tanh439[tanh]-->tanh501[tanh501 -> data -0.14888503362331798 -> grad 0]
+    weightinput2.0-415[weightinput2.0-415 -> data 2.0 -> grad 0]-->*245[*]
+    weightinput1.0-208[weightinput1.0-208 -> data 1.0 -> grad 0]-->*316[*]
+    weightinput1.0-208[weightinput1.0-208 -> data 1.0 -> grad 0]-->*23[*]
+    weightinput1.0-732[weightinput1.0-732 -> data 1.0 -> grad 0]-->*180[*]
+    weightinput1.0-732[weightinput1.0-732 -> data 1.0 -> grad 0]-->*735[*]
+    tanh732[tanh732 -> data -0.5226654296858209 -> grad 0]-->loss414[loss]
+    tanh866[tanh]-->tanh982[tanh982 -> data -0.8321231362048838 -> grad 0]
+    +507[+]-->add336[add336 -> data 0.7400000000000001 -> grad 0]
+    activation136[activation136 -> data -0.98 -> grad 0]-->+699[+]
+    add336[add336 -> data 0.7400000000000001 -> grad 0]-->tanh716[tanh]
+    activation904114[activation904]-->weightinput-1.0-904[weightinput-1.0-904 -> data -1.0 -> grad 0]
+    *406[*]-->activation114[activation114 -> data -0.4 -> grad 0]
+    weightinput-1.0-732[weightinput-1.0-732 -> data -1.0 -> grad 0]-->*654[*]
+    tanh912[tanh912 -> data 0.25429553262639115 -> grad 0]-->loss414[loss]
+    activation415423[activation415]-->weightinput3.0-415[weightinput3.0-415 -> data 3.0 -> grad 0]
+    activation287412[activation287]-->weightinput3.0-287[weightinput3.0-287 -> data 3.0 -> grad 0]
+    weight747[weight747 -> data 0.12 -> grad 0]-->*849[*]
+    weight747[weight747 -> data 0.12 -> grad 0]-->*58[*]
+    weight747[weight747 -> data 0.12 -> grad 0]-->*224[*]
+    weight747[weight747 -> data 0.12 -> grad 0]-->*994[*]
+    *636[*]-->activation559[activation559 -> data 0.14 -> grad 0]
+    *676[*]-->activation354[activation354 -> data -0.43 -> grad 0]
+    *946[*]-->activation912[activation912 -> data 0.4 -> grad 0]
+    activation788514[activation788]-->weightinput1.0-788[weightinput1.0-788 -> data 1.0 -> grad 0]
+    weightinput-1.0-712[weightinput-1.0-712 -> data -1.0 -> grad 0]-->*837[*]
+    activation424235[activation424]-->weightinput1.0-424[weightinput1.0-424 -> data 1.0 -> grad 0]
+    +953[+]-->add501[add501 -> data -0.15000000000000002 -> grad 0]
+    activation330272[activation330]-->weightinput1.0-330[weightinput1.0-330 -> data 1.0 -> grad 0]
+    activation443777[activation443]-->weightinput2.0-443[weightinput2.0-443 -> data 2.0 -> grad 0]
+    tanh788[tanh788 -> data 0.2775263502976838 -> grad 0]-->loss414[loss]
+    weightinput1.0-234[weightinput1.0-234 -> data 1.0 -> grad 0]-->*317[*]
+    weightinput1.0-234[weightinput1.0-234 -> data 1.0 -> grad 0]-->*840[*]
+    activation537633[activation537]-->weightinput0.5-537[weightinput0.5-537 -> data 0.5 -> grad 0]
+    add152[add152 -> data -0.5050000000000001 -> grad 0]-->tanh351[tanh]
+    *68[*]-->activation649[activation649 -> data -0.325 -> grad 0]
+    activation286946[activation286]-->weightinput3.0-286[weightinput3.0-286 -> data 3.0 -> grad 0]
+    tanh330[tanh330 -> data -0.9315516846152082 -> grad 0]-->loss414[loss]
+    weightinput2.0-336[weightinput2.0-336 -> data 2.0 -> grad 0]-->*672[*]
+    activation443782[activation443]-->weightinput-1.0-443[weightinput-1.0-443 -> data -1.0 -> grad 0]
+    weightinput0.5-380[weightinput0.5-380 -> data 0.5 -> grad 0]-->*989[*]
+    +852[+]-->add953[add953 -> data -1.29 -> grad 0]
+    activation400827[activation400]-->weightinput3.0-400[weightinput3.0-400 -> data 3.0 -> grad 0]
+    weightinput1.0-649[weightinput1.0-649 -> data 1.0 -> grad 0]-->*691[*]
+    add698[add698 -> data 0.5249999999999999 -> grad 0]-->tanh995[tanh]
+    activation208502[activation208]-->weightinput1.0-208[weightinput1.0-208 -> data 1.0 -> grad 0]
+    activation152558[activation152]-->weightinput1.0-152[weightinput1.0-152 -> data 1.0 -> grad 0]
+    tanh719[tanh]-->tanh537[tanh537 -> data -0.13909244787845804 -> grad 0]
+    weightinput1.0-559[weightinput1.0-559 -> data 1.0 -> grad 0]-->*636[*]
+    weightinput1.0-559[weightinput1.0-559 -> data 1.0 -> grad 0]-->*528[*]
+    add559[add559 -> data 0.9400000000000001 -> grad 0]-->tanh692[tanh]
+    *146[*]-->activation368[activation368 -> data 0.12 -> grad 0]
+    activation698389[activation698]-->weightinput1.0-698[weightinput1.0-698 -> data 1.0 -> grad 0]
+    tanh674[tanh]-->tanh863[tanh863 -> data -0.9995412853427936 -> grad 0]
+    add380[add380 -> data 1.1800000000000002 -> grad 0]-->tanh434[tanh]
+    activation912585[activation912]-->weightinput0.5-912[weightinput0.5-912 -> data 0.5 -> grad 0]
+    *245[*]-->activation415[activation415 -> data -0.12 -> grad 0]
+    *245[*]-->activation118[activation118 -> data 0.315 -> grad 0]
+    add400[add400 -> data 1.03 -> grad 0]-->tanh83[tanh]
+    weightinput-1.0-415[weightinput-1.0-415 -> data -1.0 -> grad 0]-->*849[*]
+    +210[+]-->add443[add443 -> data 2.07 -> grad 0]
+    tanh646[tanh]-->tanh912[tanh912 -> data 0.25429553262639115 -> grad 0]
+    tanh287[tanh287 -> data 0.9771395937470585 -> grad 0]-->loss414[loss]
+    weightinput3.0-287[weightinput3.0-287 -> data 3.0 -> grad 0]-->*153[*]
+    activation904909[activation904]-->weightinput1.0-904[weightinput1.0-904 -> data 1.0 -> grad 0]
+    activation71278[activation712]-->weightinput-1.0-712[weightinput-1.0-712 -> data -1.0 -> grad 0]
+    add354[add354 -> data -1.46 -> grad 0]-->tanh165[tanh]
+    add208[add208 -> data 1.29 -> grad 0]-->tanh238[tanh]
+    weightinput3.0-415[weightinput3.0-415 -> data 3.0 -> grad 0]-->*468[*]
+    activation559579[activation559]-->weightinput1.0-559[weightinput1.0-559 -> data 1.0 -> grad 0]
+    activation982719[activation982]-->weightinput3.0-982[weightinput3.0-982 -> data 3.0 -> grad 0]
+    activation415431[activation415]-->weightinput2.0-415[weightinput2.0-415 -> data 2.0 -> grad 0]
+    weightinput1.0-152[weightinput1.0-152 -> data 1.0 -> grad 0]-->*7[*]
+    weightinput1.0-152[weightinput1.0-152 -> data 1.0 -> grad 0]-->*46[*]
+    +673[+]-->add795[add795 -> data -1.4900000000000002 -> grad 0]
+    activation400646[activation400]-->weightinput-1.0-400[weightinput-1.0-400 -> data -1.0 -> grad 0]
+    activation136347[activation136]-->weightinput1.0-136[weightinput1.0-136 -> data 1.0 -> grad 0]
+    *962[*]-->activation424[activation424 -> data -0.8 -> grad 0]
+    +228[+]-->add559[add559 -> data 0.9400000000000001 -> grad 0]
+    tanh423[tanh423 -> data 0.8763930674728228 -> grad 0]-->loss414[loss]
+    weightinput0.5-953[weightinput0.5-953 -> data 0.5 -> grad 0]-->*58[*]
+    *568[*]-->activation698[activation698 -> data -0.65 -> grad 0]
+    activation118887[activation118]-->weightinput1.0-118[weightinput1.0-118 -> data 1.0 -> grad 0]
+    *506[*]-->activation795[activation795 -> data -0.43 -> grad 0]
+    add712[add712 -> data 0.2899999999999999 -> grad 0]-->tanh298[tanh]
+    weightinput0.5-424[weightinput0.5-424 -> data 0.5 -> grad 0]-->*565[*]
+    activation732736[activation732]-->weightinput1.0-732[weightinput1.0-732 -> data 1.0 -> grad 0]
+    activation336[activation336 -> data -0.63 -> grad 0]-->+507[+]
+    *994[*]-->activation501[activation501 -> data -0.12 -> grad 0]
+    tanh170[tanh170 -> data -0.9796983982280146 -> grad 0]-->loss414[loss]
+    add795[add795 -> data -1.4900000000000002 -> grad 0]-->tanh891[tanh]
+    weight633[weight633 -> data 0.75 -> grad 0]-->*339[*]
+    weight633[weight633 -> data 0.75 -> grad 0]-->*153[*]
+    weight633[weight633 -> data 0.75 -> grad 0]-->*78[*]
+    weight633[weight633 -> data 0.75 -> grad 0]-->*636[*]
+    loss414[loss]-->mse[mse -> data 8.029997116519244 -> grad 0]
+    activation537767[activation537]-->weightinput1.0-537[weightinput1.0-537 -> data 1.0 -> grad 0]
+    activation336935[activation336]-->weightinput3.0-336[weightinput3.0-336 -> data 3.0 -> grad 0]
+    activation863[activation863 -> data -0.68 -> grad 0]-->+426[+]
+    *143[*]-->activation423[activation423 -> data 0.63 -> grad 0]
+    activation295630[activation295]-->weightinput3.0-295[weightinput3.0-295 -> data 3.0 -> grad 0]
+    activation795701[activation795]-->weightinput2.0-795[weightinput2.0-795 -> data 2.0 -> grad 0]
+    *898[*]-->activation170[activation170 -> data -0.68 -> grad 0]
+    activation136513[activation136]-->weightinput1.0-136[weightinput1.0-136 -> data 1.0 -> grad 0]
+    weightinput3.0-118[weightinput3.0-118 -> data 3.0 -> grad 0]-->*207[*]
+    weightinput2.0-393[weightinput2.0-393 -> data 2.0 -> grad 0]-->*517[*]
+    activation912444[activation912]-->weightinput1.0-912[weightinput1.0-912 -> data 1.0 -> grad 0]
+    weightinput2.0-863[weightinput2.0-863 -> data 2.0 -> grad 0]-->*525[*]
+    *482[*]-->activation559[activation559 -> data 0.14 -> grad 0]
+    add649[add649 -> data 0.475 -> grad 0]-->tanh239[tanh]
+    weightinput1.0-354[weightinput1.0-354 -> data 1.0 -> grad 0]-->*997[*]
+    weightinput1.0-354[weightinput1.0-354 -> data 1.0 -> grad 0]-->*874[*]
+    activation863153[activation863]-->weightinput-1.0-863[weightinput-1.0-863 -> data -1.0 -> grad 0]
+    +397[+]-->add380[add380 -> data 1.1800000000000002 -> grad 0]
+    activation287921[activation287]-->weightinput0.5-287[weightinput0.5-287 -> data 0.5 -> grad 0]
+    +816[+]-->add712[add712 -> data 0.2899999999999999 -> grad 0]
+    *252[*]-->activation295[activation295 -> data 0.49 -> grad 0]
+    weightinput0.5-649[weightinput0.5-649 -> data 0.5 -> grad 0]-->*640[*]
+    tanh298[tanh]-->tanh712[tanh712 -> data 0.282134812669634 -> grad 0]
+    +535[+]-->add537[add537 -> data -0.14 -> grad 0]
+    activation234983[activation234]-->weightinput1.0-234[weightinput1.0-234 -> data 1.0 -> grad 0]
+    weightinput1.0-118[weightinput1.0-118 -> data 1.0 -> grad 0]-->*365[*]
+    weightinput3.0-330[weightinput3.0-330 -> data 3.0 -> grad 0]-->*58[*]
+    weightinput3.0-863[weightinput3.0-863 -> data 3.0 -> grad 0]-->*389[*]
+    weight839[weight839 -> data -0.2 -> grad 0]-->*525[*]
+    weight839[weight839 -> data -0.2 -> grad 0]-->*58[*]
+    weight839[weight839 -> data -0.2 -> grad 0]-->*536[*]
+    weight839[weight839 -> data -0.2 -> grad 0]-->*508[*]
+    tanh625[tanh]-->tanh424[tanh424 -> data 0.029991003238820046 -> grad 0]
+    weightinput3.0-712[weightinput3.0-712 -> data 3.0 -> grad 0]-->*647[*]
+    activation443588[activation443]-->weightinput3.0-443[weightinput3.0-443 -> data 3.0 -> grad 0]
+    tanh154[tanh]-->tanh732[tanh732 -> data -0.5226654296858209 -> grad 0]
+    activation795[activation795 -> data -0.43 -> grad 0]-->+673[+]
+    add286[add286 -> data -0.72 -> grad 0]-->tanh941[tanh]
+    tanh501[tanh501 -> data -0.14888503362331798 -> grad 0]-->loss414[loss]
+    +532[+]-->add904[add904 -> data 1.75 -> grad 0]
+    activation788268[activation788]-->weightinput1.0-788[weightinput1.0-788 -> data 1.0 -> grad 0]
+    +302[+]-->add982[add982 -> data -1.195 -> grad 0]
+    +250[+]-->add354[add354 -> data -1.46 -> grad 0]
+    tanh239[tanh]-->tanh649[tanh649 -> data 0.44223035604572614 -> grad 0]
+    weightinput3.0-295[weightinput3.0-295 -> data 3.0 -> grad 0]-->*435[*]
+    weight707[weight707 -> data 0.68 -> grad 0]-->*413[*]
+    weight707[weight707 -> data 0.68 -> grad 0]-->*31[*]
+    weight707[weight707 -> data 0.68 -> grad 0]-->*70[*]
+    weight707[weight707 -> data 0.68 -> grad 0]-->*898[*]
+    bias298[bias298 -> data 0.73 -> grad 0]-->+266[+]
+    bias298[bias298 -> data 0.73 -> grad 0]-->+852[+]
+    bias298[bias298 -> data 0.73 -> grad 0]-->+966[+]
+    bias298[bias298 -> data 0.73 -> grad 0]-->+953[+]
+    *187[*]-->activation136[activation136 -> data -0.98 -> grad 0]
 ```
