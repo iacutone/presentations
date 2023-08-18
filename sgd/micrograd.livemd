@@ -7,6 +7,12 @@ Mix.install([
 ])
 ```
 
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
 ## Value Tree
 
 ```elixir
@@ -38,11 +44,9 @@ defmodule Value do
     }
 
     backward = fn node ->
-      # IO.inspect node, label: "node"
-      # IO.inspect left, label: "left"
-      # IO.inspect right, label: "right"
       left = %Value{left | grad: left.grad + node.grad}
       right = %Value{right | grad: right.grad + node.grad}
+
       %Value{node | _prev: previous(left, right)}
     end
 
@@ -61,8 +65,7 @@ defmodule Value do
     backward = fn node ->
       left = %Value{left | grad: right.data * node.grad}
       right = %Value{right | grad: left.data * node.grad}
-      # IO.inspect left, label: "left"
-      # IO.inspect right, label: "right"
+
       %Value{node | _prev: previous(left, right)}
     end
 
@@ -101,8 +104,8 @@ defmodule Value do
           data: data,
           grad: grad,
           label: label,
+          _prev: nodes,
           _op: op,
-          # _prev: nodes,
           _backward: backward
         } = node
       ) do
@@ -145,11 +148,8 @@ defmodule Value do
         backprop(child)
       end)
 
-    IO.inspect(data, label: "data")
-    IO.inspect(grad, label: "grad")
-
     %Value{
-      data: data + -0.1 * grad,
+      data: data + -0.5 * grad,
       grad: grad,
       label: label,
       _backward: backward,
@@ -160,6 +160,20 @@ defmodule Value do
 end
 ```
 
+<!-- livebook:{"output":true} -->
+
+```
+warning: variable "nodes" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  micrograd.livemd#cell:ve2rgmzetb5yunf4czqx6kcustznsxcv:88: Value.backward1/1
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Value, <<70, 79, 82, 49, 0, 0, 33, ...>>, {:backprop, 1}}
+```
+
 ## Interacting with the Value API
 
 ```elixir
@@ -167,6 +181,32 @@ a = %Value{data: 2, label: "a"}
 b = %Value{data: -3, label: "b"}
 c = %Value{data: 10, label: "c"}
 d = Value.mult(a, b, "e") |> Value.add(c, "d", 1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Value{
+  data: 4,
+  grad: 1,
+  label: "d",
+  _backward: #Function<1.92911903/1 in Value.add/4>,
+  _op: "+",
+  _prev: [
+    %Value{
+      data: -6,
+      grad: 0,
+      label: "e",
+      _backward: #Function<4.92911903/1 in Value.mult/4>,
+      _op: "*",
+      _prev: [
+        %Value{data: 2, grad: 0, label: "a", _backward: nil, _op: "", _prev: []},
+        %Value{data: -3, grad: 0, label: "b", _backward: nil, _op: "", _prev: []}
+      ]
+    },
+    %Value{data: 10, grad: 0, label: "c", _backward: nil, _op: "", _prev: []}
+  ]
+}
 ```
 
 ## Add Value Tree Visualizations
@@ -213,10 +253,28 @@ defmodule Graph do
 end
 ```
 
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Graph, <<70, 79, 82, 49, 0, 0, 19, ...>>, {:build_dot, 3}}
+```
+
 ```elixir
 d
 |> Value.backward1()
 |> Graph.draw_dot()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+graph LR
+    *36[*]-->e[e -> data -6 -> grad 1]
+    b[b -> data -3 -> grad 2]-->*36[*]
+    e[e -> data -6 -> grad 1]-->+674[+]
+    c[c -> data 10 -> grad 1]-->+674[+]
+    a[a -> data 2 -> grad -3]-->*36[*]
+    +674[+]-->d[d -> data 4 -> grad 1]
 ```
 
 ```mermaid
@@ -243,6 +301,21 @@ l = Value.mult(d, f, "L", 1)
 l
 |> Value.backward1()
 |> Graph.draw_dot()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+graph LR
+    f[f -> data -2 -> grad 4]-->*656[*]
+    b[b -> data -3 -> grad -4]-->*523[*]
+    *523[*]-->e[e -> data -6 -> grad -2]
+    +310[+]-->d[d -> data 4 -> grad -2]
+    e[e -> data -6 -> grad -2]-->+310[+]
+    c[c -> data 10 -> grad -2]-->+310[+]
+    a[a -> data 2 -> grad 6]-->*523[*]
+    *656[*]-->L[L -> data -8 -> grad 1]
+    d[d -> data 4 -> grad -2]-->*656[*]
 ```
 
 ```mermaid
@@ -280,6 +353,26 @@ o
 |> Graph.draw_dot()
 ```
 
+<!-- livebook:{"output":true} -->
+
+```
+graph LR
+    +414[+]-->n[n -> data 0.8813735870195414 -> grad 0.5000000000000011]
+    b[b -> data 6.881373587019541 -> grad 0.5000000000000011]-->+414[+]
+    x1[x1 -> data 2.0 -> grad -1.5000000000000033]-->*714[*]
+    +789[+]-->x1*w1+x2*w2[x1*w1+x2*w2 -> data -6.0 -> grad 0.5000000000000011]
+    *916[*]-->x2*w2[x2*w2 -> data 0.0 -> grad 0.5000000000000011]
+    w2[w2 -> data 1.0 -> grad 0.0]-->*916[*]
+    x1*w1[x1*w1 -> data -6.0 -> grad 0.5000000000000011]-->+789[+]
+    x1*w1+x2*w2[x1*w1+x2*w2 -> data -6.0 -> grad 0.5000000000000011]-->+414[+]
+    tanh53[tanh]-->o[o -> data 0.7071067811865467 -> grad 1]
+    *714[*]-->x1*w1[x1*w1 -> data -6.0 -> grad 0.5000000000000011]
+    w1[w1 -> data -3.0 -> grad 1.0000000000000022]-->*714[*]
+    n[n -> data 0.8813735870195414 -> grad 0.5000000000000011]-->tanh53[tanh]
+    x2*w2[x2*w2 -> data 0.0 -> grad 0.5000000000000011]-->+789[+]
+    x2[x2 -> data 0.0 -> grad 0.5000000000000011]-->*916[*]
+```
+
 ```mermaid
 graph LR
     +417[+]-->x1*w1+x2*w2[x1*w1+x2*w2 -> data -6.0 -> grad 0.5]
@@ -298,8 +391,34 @@ graph LR
     x2[x2 -> data 0.0 -> grad 0.5]-->*558[*]
 ```
 
+## What's Nx Doing
+
 ```elixir
 # do Axon example instead of Neuron module
+
+x1 = Nx.tensor([2.0])
+x2 = Nx.tensor([0.0])
+
+w1 = Nx.tensor([-3.0])
+w2 = Nx.tensor([1.0])
+
+b = Nx.tensor([6.8813735870195432])
+
+x1w1 = Nx.multiply(x1, w1)
+x2w2 = Nx.multiply(x2, w2)
+
+output = x1w1 |> Nx.add(x2w2) |> Nx.add(b)
+Nx.tanh(output)
+# How do I call backward?
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+#Nx.Tensor<
+  f32[1]
+  [0.7071067094802856]
+>
 ```
 
 ```elixir
@@ -308,14 +427,18 @@ defmodule Neuron do
     to_string(:rand.uniform(1000))
   end
 
+  def random_int do
+    Enum.random(-100..100) / 100
+  end
+
   def new(nin) do
     # Weight parameter inputs, these values change as via SGD as the network 'learns'
     weights =
       Enum.reduce(0..(nin - 1), [], fn _i, acc ->
-        acc ++ [%Value{data: Enum.random(-100..100) / 100, label: "weight#{rid()}"}]
+        acc ++ [%Value{data: random_int(), label: "input-weight#{rid()}"}]
       end)
 
-    %{weights: weights, b: %Value{data: Enum.random(-100..100) / 100, label: "bias#{rid()}"}}
+    %{weights: weights, b: %Value{data: random_int(), label: "input-bias#{rid()}"}}
   end
 
   def call(x, %{weights: weights, b: b}) do
@@ -329,7 +452,7 @@ defmodule Neuron do
           %Value{
             data: x,
             _op: "activation" <> rid,
-            label: "weightinput#{x}-" <> rid
+            label: "xs-input#{x}-" <> rid
           },
           neuron,
           "activation" <> rid
@@ -342,12 +465,22 @@ defmodule Neuron do
       end)
       |> Enum.sum()
 
+    # activation166 has no _op or backward but it should
+    # backward = fn node ->
+    #   left = %Value{left | grad: left.grad + node.grad}
+    #   right = %Value{right | grad: right.grad + node.grad}
+
+    #   %Value{node | _prev: previous(left, right)}
+    # end
+
     activations =
       Value.add(
         %Value{
           data: sum,
           label: "activation" <> rid,
-          _prev: activations
+          _prev: activations,
+          # _backward: backward,
+          _op: "+"
         },
         b,
         "add" <> rid
@@ -372,7 +505,6 @@ defmodule Layer do
   end
 
   def call(x, neurons) do
-    # IO.inspect neurons, label: "neurons"
     Enum.map(neurons, fn neuron ->
       Neuron.call(x, neuron)
     end)
@@ -452,6 +584,20 @@ end
 # MLP.call(x, mlp)
 ```
 
+<!-- livebook:{"output":true} -->
+
+```
+warning: variable "label" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  micrograd.livemd#cell:2g6jigpb7nut5rxn4jldjfdphp2odwfp:25: Neuron.call/2
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, MLP, <<70, 79, 82, 49, 0, 0, 11, ...>>, {:parameters, 1}}
+```
+
 ```elixir
 # binary classifier example
 # inputs to the neural network
@@ -470,18 +616,527 @@ xs = [
 ys = [1.0, -1.0, -1.0, 1.0]
 
 # first arg needs to be same length as xs list's length
-init_mlp = MLP.new(3, [1])
+init_mlp = MLP.new(3, [1]) |> IO.inspect(label: "mlp")
+
+layers =
+  Enum.map(xs, fn row ->
+    MLP.call(row, init_mlp)
+  end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+mlp: [
+  [
+    %{
+      b: %Value{
+        data: 0.58,
+        grad: 0,
+        label: "input-bias781",
+        _backward: nil,
+        _op: "",
+        _prev: []
+      },
+      weights: [
+        %Value{
+          data: -0.5,
+          grad: 0,
+          label: "input-weight228",
+          _backward: nil,
+          _op: "",
+          _prev: []
+        },
+        %Value{
+          data: 0.74,
+          grad: 0,
+          label: "input-weight852",
+          _backward: nil,
+          _op: "",
+          _prev: []
+        },
+        %Value{
+          data: -0.02,
+          grad: 0,
+          label: "input-weight712",
+          _backward: nil,
+          _op: "",
+          _prev: []
+        }
+      ]
+    }
+  ]
+]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  [
+    [
+      %Value{
+        data: 0.9488384233759846,
+        grad: 1,
+        label: "ypred166",
+        _backward: #Function<5.92911903/1 in Value.tanh/3>,
+        _op: "tanh",
+        _prev: [
+          %Value{
+            data: 1.8199999999999998,
+            grad: 0,
+            label: "add166",
+            _backward: #Function<1.92911903/1 in Value.add/4>,
+            _op: "+",
+            _prev: [
+              %Value{
+                data: 1.2399999999999998,
+                grad: 0,
+                label: "activation166",
+                _backward: nil,
+                _op: "",
+                _prev: [
+                  %Value{
+                    data: -1.0,
+                    grad: 0,
+                    label: "activation166",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: 2.0,
+                        grad: 0,
+                        label: "xs-input2.0-166",
+                        _backward: nil,
+                        _op: "activation166",
+                        _prev: []
+                      },
+                      %Value{
+                        data: -0.5,
+                        grad: 0,
+                        label: "input-weight228",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  },
+                  %Value{
+                    data: 2.2199999999999998,
+                    grad: 0,
+                    label: "activation166",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: 3.0,
+                        grad: 0,
+                        label: "xs-input3.0-166",
+                        _backward: nil,
+                        _op: "activation166",
+                        _prev: []
+                      },
+                      %Value{
+                        data: 0.74,
+                        grad: 0,
+                        label: "input-weight852",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  },
+                  %Value{
+                    data: 0.02,
+                    grad: 0,
+                    label: "activation166",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: -1.0,
+                        grad: 0,
+                        label: "xs-input-1.0-166",
+                        _backward: nil,
+                        _op: "activation166",
+                        _prev: []
+                      },
+                      %Value{
+                        data: -0.02,
+                        grad: 0,
+                        label: "input-weight712",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  }
+                ]
+              },
+              %Value{
+                data: 0.58,
+                grad: 0,
+                label: "input-bias781",
+                _backward: nil,
+                _op: "",
+                _prev: []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  ],
+  [
+    [
+      %Value{
+        data: -0.18774620586828542,
+        grad: 1,
+        label: "ypred837",
+        _backward: #Function<5.92911903/1 in Value.tanh/3>,
+        _op: "tanh",
+        _prev: [
+          %Value{
+            data: -0.19000000000000006,
+            grad: 0,
+            label: "add837",
+            _backward: #Function<1.92911903/1 in Value.add/4>,
+            _op: "+",
+            _prev: [
+              %Value{
+                data: -0.77,
+                grad: 0,
+                label: "activation837",
+                _backward: nil,
+                _op: "",
+                _prev: [
+                  %Value{
+                    data: -1.5,
+                    grad: 0,
+                    label: "activation837",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: 3.0,
+                        grad: 0,
+                        label: "xs-input3.0-837",
+                        _backward: nil,
+                        _op: "activation837",
+                        _prev: []
+                      },
+                      %Value{
+                        data: -0.5,
+                        grad: 0,
+                        label: "input-weight228",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  },
+                  %Value{
+                    data: 0.74,
+                    grad: 0,
+                    label: "activation837",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: 1.0,
+                        grad: 0,
+                        label: "xs-input1.0-837",
+                        _backward: nil,
+                        _op: "activation837",
+                        _prev: []
+                      },
+                      %Value{
+                        data: 0.74,
+                        grad: 0,
+                        label: "input-weight852",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  },
+                  %Value{
+                    data: -0.01,
+                    grad: 0,
+                    label: "activation837",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: 0.5,
+                        grad: 0,
+                        label: "xs-input0.5-837",
+                        _backward: nil,
+                        _op: "activation837",
+                        _prev: []
+                      },
+                      %Value{
+                        data: -0.02,
+                        grad: 0,
+                        label: "input-weight712",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  }
+                ]
+              },
+              %Value{
+                data: 0.58,
+                grad: 0,
+                label: "input-bias781",
+                _backward: nil,
+                _op: "",
+                _prev: []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  ],
+  [
+    [
+      %Value{
+        data: 0.781806357608774,
+        grad: 1,
+        label: "ypred72",
+        _backward: #Function<5.92911903/1 in Value.tanh/3>,
+        _op: "tanh",
+        _prev: [
+          %Value{
+            data: 1.0499999999999998,
+            grad: 0,
+            label: "add72",
+            _backward: #Function<1.92911903/1 in Value.add/4>,
+            _op: "+",
+            _prev: [
+              %Value{
+                data: 0.47,
+                grad: 0,
+                label: "activation72",
+                _backward: nil,
+                _op: "",
+                _prev: [
+                  %Value{
+                    data: -0.25,
+                    grad: 0,
+                    label: "activation72",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: 0.5,
+                        grad: 0,
+                        label: "xs-input0.5-72",
+                        _backward: nil,
+                        _op: "activation72",
+                        _prev: []
+                      },
+                      %Value{
+                        data: -0.5,
+                        grad: 0,
+                        label: "input-weight228",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  },
+                  %Value{
+                    data: 0.74,
+                    grad: 0,
+                    label: "activation72",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: 1.0,
+                        grad: 0,
+                        label: "xs-input1.0-72",
+                        _backward: nil,
+                        _op: "activation72",
+                        _prev: []
+                      },
+                      %Value{
+                        data: 0.74,
+                        grad: 0,
+                        label: "input-weight852",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  },
+                  %Value{
+                    data: -0.02,
+                    grad: 0,
+                    label: "activation72",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: 1.0,
+                        grad: 0,
+                        label: "xs-input1.0-72",
+                        _backward: nil,
+                        _op: "activation72",
+                        _prev: []
+                      },
+                      %Value{
+                        data: -0.02,
+                        grad: 0,
+                        label: "input-weight712",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  }
+                ]
+              },
+              %Value{
+                data: 0.58,
+                grad: 0,
+                label: "input-bias781",
+                _backward: nil,
+                _op: "",
+                _prev: []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  ],
+  [
+    [
+      %Value{
+        data: 0.6858090622290945,
+        grad: 1,
+        label: "ypred758",
+        _backward: #Function<5.92911903/1 in Value.tanh/3>,
+        _op: "tanh",
+        _prev: [
+          %Value{
+            data: 0.84,
+            grad: 0,
+            label: "add758",
+            _backward: #Function<1.92911903/1 in Value.add/4>,
+            _op: "+",
+            _prev: [
+              %Value{
+                data: 0.26,
+                grad: 0,
+                label: "activation758",
+                _backward: nil,
+                _op: "",
+                _prev: [
+                  %Value{
+                    data: -0.5,
+                    grad: 0,
+                    label: "activation758",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: 1.0,
+                        grad: 0,
+                        label: "xs-input1.0-758",
+                        _backward: nil,
+                        _op: "activation758",
+                        _prev: []
+                      },
+                      %Value{
+                        data: -0.5,
+                        grad: 0,
+                        label: "input-weight228",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  },
+                  %Value{
+                    data: 0.74,
+                    grad: 0,
+                    label: "activation758",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: 1.0,
+                        grad: 0,
+                        label: "xs-input1.0-758",
+                        _backward: nil,
+                        _op: "activation758",
+                        _prev: []
+                      },
+                      %Value{
+                        data: 0.74,
+                        grad: 0,
+                        label: "input-weight852",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  },
+                  %Value{
+                    data: 0.02,
+                    grad: 0,
+                    label: "activation758",
+                    _backward: #Function<4.92911903/1 in Value.mult/4>,
+                    _op: "*",
+                    _prev: [
+                      %Value{
+                        data: -1.0,
+                        grad: 0,
+                        label: "xs-input-1.0-758",
+                        _backward: nil,
+                        _op: "activation758",
+                        _prev: []
+                      },
+                      %Value{
+                        data: -0.02,
+                        grad: 0,
+                        label: "input-weight712",
+                        _backward: nil,
+                        _op: "",
+                        _prev: []
+                      }
+                    ]
+                  }
+                ]
+              },
+              %Value{
+                data: 0.58,
+                grad: 0,
+                label: "input-bias781",
+                _backward: nil,
+                _op: "",
+                _prev: []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  ]
+]
 ```
 
 ## All Together Now
 
 ```elixir
+# Enum.each(1..5, fn i ->
 # Forward pass
-layers =
-  Enum.map(xs, fn row ->
-    MLP.call(row, init_mlp)
-  end)
-
 # select the last layer
 ypreds =
   Enum.reduce(layers, [], fn l, acc ->
@@ -502,100 +1157,632 @@ mse =
   end)
   |> Enum.sum()
 
-backward = fn node ->
-  node
-end
-
 # backward pass
-loss =
-  %Value{
-    data: mse,
-    grad: 1,
-    label: "mse",
-    _op: "loss",
-    _prev: List.flatten(layers),
-    _backward: backward
-  }
-  |> Value.backward1()
-  |> Value.backprop()
-  |> Graph.draw_dot()
+%Value{
+  data: mse,
+  grad: 1,
+  label: "mse",
+  _op: "loss",
+  _prev: List.flatten(layers),
+  _backward: fn node -> node end
+}
+|> Value.backward1()
+|> IO.inspect()
+# |> Value.backprop()
+|> Graph.draw_dot()
+
+#   IO.inspect("interval: #{i}, loss: #{mse}")
+# end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Value{
+  data: 3.9359235743964285,
+  grad: 1,
+  label: "mse",
+  _backward: #Function<42.3316493/1 in :erl_eval.expr/6>,
+  _op: "loss",
+  _prev: [
+    %Value{
+      data: 0.9488384233759846,
+      grad: 1,
+      label: "ypred166",
+      _backward: #Function<5.92911903/1 in Value.tanh/3>,
+      _op: "tanh",
+      _prev: [
+        %Value{
+          data: 1.8199999999999998,
+          grad: 0.09970564632537582,
+          label: "add166",
+          _backward: #Function<1.92911903/1 in Value.add/4>,
+          _op: "+",
+          _prev: [
+            %Value{
+              data: 1.2399999999999998,
+              grad: 0.09970564632537582,
+              label: "activation166",
+              _backward: nil,
+              _op: "",
+              _prev: [
+                %Value{
+                  data: -1.0,
+                  grad: 0,
+                  label: "activation166",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: 2.0,
+                      grad: -0.0,
+                      label: "xs-input2.0-166",
+                      _backward: nil,
+                      _op: "activation166",
+                      _prev: []
+                    },
+                    %Value{
+                      data: -0.5,
+                      grad: 0.0,
+                      label: "input-weight228",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                },
+                %Value{
+                  data: 2.2199999999999998,
+                  grad: 0,
+                  label: "activation166",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: 3.0,
+                      grad: 0.0,
+                      label: "xs-input3.0-166",
+                      _backward: nil,
+                      _op: "activation166",
+                      _prev: []
+                    },
+                    %Value{
+                      data: 0.74,
+                      grad: 0.0,
+                      label: "input-weight852",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                },
+                %Value{
+                  data: 0.02,
+                  grad: 0,
+                  label: "activation166",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: -1.0,
+                      grad: -0.0,
+                      label: "xs-input-1.0-166",
+                      _backward: nil,
+                      _op: "activation166",
+                      _prev: []
+                    },
+                    %Value{
+                      data: -0.02,
+                      grad: -0.0,
+                      label: "input-weight712",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                }
+              ]
+            },
+            %Value{
+              data: 0.58,
+              grad: 0.09970564632537582,
+              label: "input-bias781",
+              _backward: nil,
+              _op: "",
+              _prev: []
+            }
+          ]
+        }
+      ]
+    },
+    %Value{
+      data: -0.18774620586828542,
+      grad: 1,
+      label: "ypred837",
+      _backward: #Function<5.92911903/1 in Value.tanh/3>,
+      _op: "tanh",
+      _prev: [
+        %Value{
+          data: -0.19000000000000006,
+          grad: 0.9647513621820634,
+          label: "add837",
+          _backward: #Function<1.92911903/1 in Value.add/4>,
+          _op: "+",
+          _prev: [
+            %Value{
+              data: -0.77,
+              grad: 0.9647513621820634,
+              label: "activation837",
+              _backward: nil,
+              _op: "",
+              _prev: [
+                %Value{
+                  data: -1.5,
+                  grad: 0,
+                  label: "activation837",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: 3.0,
+                      grad: -0.0,
+                      label: "xs-input3.0-837",
+                      _backward: nil,
+                      _op: "activation837",
+                      _prev: []
+                    },
+                    %Value{
+                      data: -0.5,
+                      grad: 0.0,
+                      label: "input-weight228",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                },
+                %Value{
+                  data: 0.74,
+                  grad: 0,
+                  label: "activation837",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: 1.0,
+                      grad: 0.0,
+                      label: "xs-input1.0-837",
+                      _backward: nil,
+                      _op: "activation837",
+                      _prev: []
+                    },
+                    %Value{
+                      data: 0.74,
+                      grad: 0.0,
+                      label: "input-weight852",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                },
+                %Value{
+                  data: -0.01,
+                  grad: 0,
+                  label: "activation837",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: 0.5,
+                      grad: -0.0,
+                      label: "xs-input0.5-837",
+                      _backward: nil,
+                      _op: "activation837",
+                      _prev: []
+                    },
+                    %Value{
+                      data: -0.02,
+                      grad: 0.0,
+                      label: "input-weight712",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                }
+              ]
+            },
+            %Value{
+              data: 0.58,
+              grad: 0.9647513621820634,
+              label: "input-bias781",
+              _backward: nil,
+              _op: "",
+              _prev: []
+            }
+          ]
+        }
+      ]
+    },
+    %Value{
+      data: 0.781806357608774,
+      grad: 1,
+      label: "ypred72",
+      _backward: #Function<5.92911903/1 in Value.tanh/3>,
+      _op: "tanh",
+      _prev: [
+        %Value{
+          data: 1.0499999999999998,
+          grad: 0.3887788192025017,
+          label: "add72",
+          _backward: #Function<1.92911903/1 in Value.add/4>,
+          _op: "+",
+          _prev: [
+            %Value{
+              data: 0.47,
+              grad: 0.3887788192025017,
+              label: "activation72",
+              _backward: nil,
+              _op: "",
+              _prev: [
+                %Value{
+                  data: -0.25,
+                  grad: 0,
+                  label: "activation72",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: 0.5,
+                      grad: -0.0,
+                      label: "xs-input0.5-72",
+                      _backward: nil,
+                      _op: "activation72",
+                      _prev: []
+                    },
+                    %Value{
+                      data: -0.5,
+                      grad: 0.0,
+                      label: "input-weight228",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                },
+                %Value{
+                  data: 0.74,
+                  grad: 0,
+                  label: "activation72",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: 1.0,
+                      grad: 0.0,
+                      label: "xs-input1.0-72",
+                      _backward: nil,
+                      _op: "activation72",
+                      _prev: []
+                    },
+                    %Value{
+                      data: 0.74,
+                      grad: 0.0,
+                      label: "input-weight852",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                },
+                %Value{
+                  data: -0.02,
+                  grad: 0,
+                  label: "activation72",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: 1.0,
+                      grad: -0.0,
+                      label: "xs-input1.0-72",
+                      _backward: nil,
+                      _op: "activation72",
+                      _prev: []
+                    },
+                    %Value{
+                      data: -0.02,
+                      grad: 0.0,
+                      label: "input-weight712",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                }
+              ]
+            },
+            %Value{
+              data: 0.58,
+              grad: 0.3887788192025017,
+              label: "input-bias781",
+              _backward: nil,
+              _op: "",
+              _prev: []
+            }
+          ]
+        }
+      ]
+    },
+    %Value{
+      data: 0.6858090622290945,
+      grad: 1,
+      label: "ypred758",
+      _backward: #Function<5.92911903/1 in Value.tanh/3>,
+      _op: "tanh",
+      _prev: [
+        %Value{
+          data: 0.84,
+          grad: 0.52966593016445,
+          label: "add758",
+          _backward: #Function<1.92911903/1 in Value.add/4>,
+          _op: "+",
+          _prev: [
+            %Value{
+              data: 0.26,
+              grad: 0.52966593016445,
+              label: "activation758",
+              _backward: nil,
+              _op: "",
+              _prev: [
+                %Value{
+                  data: -0.5,
+                  grad: 0,
+                  label: "activation758",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: 1.0,
+                      grad: -0.0,
+                      label: "xs-input1.0-758",
+                      _backward: nil,
+                      _op: "activation758",
+                      _prev: []
+                    },
+                    %Value{
+                      data: -0.5,
+                      grad: 0.0,
+                      label: "input-weight228",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                },
+                %Value{
+                  data: 0.74,
+                  grad: 0,
+                  label: "activation758",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: 1.0,
+                      grad: 0.0,
+                      label: "xs-input1.0-758",
+                      _backward: nil,
+                      _op: "activation758",
+                      _prev: []
+                    },
+                    %Value{
+                      data: 0.74,
+                      grad: 0.0,
+                      label: "input-weight852",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                },
+                %Value{
+                  data: 0.02,
+                  grad: 0,
+                  label: "activation758",
+                  _backward: #Function<4.92911903/1 in Value.mult/4>,
+                  _op: "*",
+                  _prev: [
+                    %Value{
+                      data: -1.0,
+                      grad: -0.0,
+                      label: "xs-input-1.0-758",
+                      _backward: nil,
+                      _op: "activation758",
+                      _prev: []
+                    },
+                    %Value{
+                      data: -0.02,
+                      grad: -0.0,
+                      label: "input-weight712",
+                      _backward: nil,
+                      _op: "",
+                      _prev: []
+                    }
+                  ]
+                }
+              ]
+            },
+            %Value{
+              data: 0.58,
+              grad: 0.52966593016445,
+              label: "input-bias781",
+              _backward: nil,
+              _op: "",
+              _prev: []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+graph LR
+    xs-input-1.0-758[xs-input-1.0-758 -> data -1.0 -> grad -0.0]-->*478[*]
+    activation837[activation837 -> data -0.01 -> grad 0]-->+287[+]
+    *924[*]-->activation837[activation837 -> data -0.01 -> grad 0]
+    xs-input3.0-837[xs-input3.0-837 -> data 3.0 -> grad -0.0]-->*924[*]
+    add166[add166 -> data 1.8199999999999998 -> grad 0.09970564632537582]-->tanh574[tanh]
+    tanh878[tanh]-->ypred758[ypred758 -> data 0.6858090622290945 -> grad 1]
+    input-weight852[input-weight852 -> data 0.74 -> grad 0.0]-->*660[*]
+    input-weight852[input-weight852 -> data 0.74 -> grad 0.0]-->*892[*]
+    input-weight852[input-weight852 -> data 0.74 -> grad 0.0]-->*603[*]
+    input-weight852[input-weight852 -> data 0.74 -> grad 0.0]-->*493[*]
+    xs-input-1.0-166[xs-input-1.0-166 -> data -1.0 -> grad -0.0]-->*206[*]
+    tanh855[tanh]-->ypred72[ypred72 -> data 0.781806357608774 -> grad 1]
+    *206[*]-->activation166[activation166 -> data 0.02 -> grad 0]
+    activation72859[activation72]-->xs-input0.5-72[xs-input0.5-72 -> data 0.5 -> grad -0.0]
+    activation166[activation166 -> data 0.02 -> grad 0]-->+816[+]
+    *603[*]-->activation72[activation72 -> data -0.02 -> grad 0]
+    +309[+]-->add758[add758 -> data 0.84 -> grad 0.52966593016445]
+    +287[+]-->add837[add837 -> data -0.19000000000000006 -> grad 0.9647513621820634]
+    activation837265[activation837]-->xs-input0.5-837[xs-input0.5-837 -> data 0.5 -> grad -0.0]
+    activation72[activation72 -> data -0.02 -> grad 0]-->+939[+]
+    xs-input1.0-758[xs-input1.0-758 -> data 1.0 -> grad 0.0]-->*853[*]
+    xs-input1.0-758[xs-input1.0-758 -> data 1.0 -> grad 0.0]-->*493[*]
+    activation166681[activation166]-->xs-input2.0-166[xs-input2.0-166 -> data 2.0 -> grad -0.0]
+    activation16695[activation166]-->xs-input-1.0-166[xs-input-1.0-166 -> data -1.0 -> grad -0.0]
+    activation758[activation758 -> data 0.02 -> grad 0]-->+309[+]
+    xs-input0.5-72[xs-input0.5-72 -> data 0.5 -> grad -0.0]-->*250[*]
+    *892[*]-->activation837[activation837 -> data -0.01 -> grad 0]
+    activation837426[activation837]-->xs-input3.0-837[xs-input3.0-837 -> data 3.0 -> grad -0.0]
+    activation16632[activation166]-->xs-input3.0-166[xs-input3.0-166 -> data 3.0 -> grad 0.0]
+    *336[*]-->activation166[activation166 -> data 0.02 -> grad 0]
+    activation758553[activation758]-->xs-input1.0-758[xs-input1.0-758 -> data 1.0 -> grad 0.0]
+    ypred758[ypred758 -> data 0.6858090622290945 -> grad 1]-->loss121[loss]
+    tanh574[tanh]-->ypred166[ypred166 -> data 0.9488384233759846 -> grad 1]
+    xs-input1.0-837[xs-input1.0-837 -> data 1.0 -> grad 0.0]-->*892[*]
+    activation758960[activation758]-->xs-input-1.0-758[xs-input-1.0-758 -> data -1.0 -> grad -0.0]
+    activation72628[activation72]-->xs-input1.0-72[xs-input1.0-72 -> data 1.0 -> grad -0.0]
+    ypred837[ypred837 -> data -0.18774620586828542 -> grad 1]-->loss121[loss]
+    *493[*]-->activation758[activation758 -> data 0.02 -> grad 0]
+    input-bias781[input-bias781 -> data 0.58 -> grad 0.52966593016445]-->+816[+]
+    input-bias781[input-bias781 -> data 0.58 -> grad 0.52966593016445]-->+287[+]
+    input-bias781[input-bias781 -> data 0.58 -> grad 0.52966593016445]-->+939[+]
+    input-bias781[input-bias781 -> data 0.58 -> grad 0.52966593016445]-->+309[+]
+    input-weight712[input-weight712 -> data -0.02 -> grad -0.0]-->*206[*]
+    input-weight712[input-weight712 -> data -0.02 -> grad -0.0]-->*591[*]
+    input-weight712[input-weight712 -> data -0.02 -> grad -0.0]-->*777[*]
+    input-weight712[input-weight712 -> data -0.02 -> grad -0.0]-->*478[*]
+    xs-input0.5-837[xs-input0.5-837 -> data 0.5 -> grad -0.0]-->*591[*]
+    add72[add72 -> data 1.0499999999999998 -> grad 0.3887788192025017]-->tanh855[tanh]
+    activation758406[activation758]-->xs-input1.0-758[xs-input1.0-758 -> data 1.0 -> grad 0.0]
+    xs-input2.0-166[xs-input2.0-166 -> data 2.0 -> grad -0.0]-->*336[*]
+    ypred166[ypred166 -> data 0.9488384233759846 -> grad 1]-->loss121[loss]
+    activation72702[activation72]-->xs-input1.0-72[xs-input1.0-72 -> data 1.0 -> grad -0.0]
+    activation837563[activation837]-->xs-input1.0-837[xs-input1.0-837 -> data 1.0 -> grad 0.0]
+    loss121[loss]-->mse[mse -> data 3.9359235743964285 -> grad 1]
+    +939[+]-->add72[add72 -> data 1.0499999999999998 -> grad 0.3887788192025017]
+    add758[add758 -> data 0.84 -> grad 0.52966593016445]-->tanh878[tanh]
+    *250[*]-->activation72[activation72 -> data -0.02 -> grad 0]
+    xs-input1.0-72[xs-input1.0-72 -> data 1.0 -> grad -0.0]-->*603[*]
+    xs-input1.0-72[xs-input1.0-72 -> data 1.0 -> grad -0.0]-->*777[*]
+    ypred72[ypred72 -> data 0.781806357608774 -> grad 1]-->loss121[loss]
+    input-weight228[input-weight228 -> data -0.5 -> grad 0.0]-->*336[*]
+    input-weight228[input-weight228 -> data -0.5 -> grad 0.0]-->*924[*]
+    input-weight228[input-weight228 -> data -0.5 -> grad 0.0]-->*250[*]
+    input-weight228[input-weight228 -> data -0.5 -> grad 0.0]-->*853[*]
+    add837[add837 -> data -0.19000000000000006 -> grad 0.9647513621820634]-->tanh300[tanh]
+    +816[+]-->add166[add166 -> data 1.8199999999999998 -> grad 0.09970564632537582]
+    *853[*]-->activation758[activation758 -> data 0.02 -> grad 0]
+    *777[*]-->activation72[activation72 -> data -0.02 -> grad 0]
+    *660[*]-->activation166[activation166 -> data 0.02 -> grad 0]
+    *478[*]-->activation758[activation758 -> data 0.02 -> grad 0]
+    *591[*]-->activation837[activation837 -> data -0.01 -> grad 0]
+    xs-input3.0-166[xs-input3.0-166 -> data 3.0 -> grad 0.0]-->*660[*]
+    tanh300[tanh]-->ypred837[ypred837 -> data -0.18774620586828542 -> grad 1]
 ```
 
 ```mermaid
 graph LR
-    loss656[loss]-->mse[mse -> data 3.522866991219371 -> grad 1]
-    activation634[activation634 -> data 0.6 -> grad 0]-->+74[+]
-    +74[+]-->add634[add634 -> data 0.9047278962952275 -> grad 0.45272103704772404]
-    add693[add693 -> data 0.006094446961614403 -> grad 0.9890555303838569]-->tanh891[tanh]
-    tanh284[tanh]-->ypred678[ypred678 -> data 0.4226654296858209 -> grad 1]
-    weightinput3.0-634[weightinput3.0-634 -> data 3.0 -> grad -0.0]-->*445[*]
-    *405[*]-->activation693[activation693 -> data -0.6 -> grad 0]
-    *645[*]-->activation678[activation678 -> data -0.3 -> grad 0]
-    add212[add212 -> data 1.3159812506520656 -> grad 0.2401874934793421]-->tanh294[tanh]
-    activation634147[activation634]-->weightinput2.0-634[weightinput2.0-634 -> data 2.0 -> grad 0.0]
-    *678[*]-->activation634[activation634 -> data 0.6 -> grad 0]
-    +985[+]-->add693[add693 -> data 0.006094446961614403 -> grad 0.9890555303838569]
-    weightinput-1.0-634[weightinput-1.0-634 -> data -1.0 -> grad -0.0]-->*678[*]
-    activation693363[activation693]-->weightinput1.0-693[weightinput1.0-693 -> data 1.0 -> grad -0.0]
-    tanh891[tanh]-->ypred693[ypred693 -> data 0.004615819148650599 -> grad 1]
-    weightinput0.5-678[weightinput0.5-678 -> data 0.5 -> grad -0.0]-->*889[*]
-    *9[*]-->activation212[activation212 -> data 0.6 -> grad 0]
-    activation693279[activation693]-->weightinput0.5-693[weightinput0.5-693 -> data 0.5 -> grad 0.0]
-    *889[*]-->activation678[activation678 -> data -0.3 -> grad 0]
-    activation212[activation212 -> data 0.6 -> grad 0]-->+287[+]
-    weightinput1.0-678[weightinput1.0-678 -> data 1.0 -> grad -0.0]-->*387[*]
-    +287[+]-->add212[add212 -> data 1.3159812506520656 -> grad 0.2401874934793421]
-    weightinput1.0-212[weightinput1.0-212 -> data 1.0 -> grad -0.0]-->*750[*]
-    weightinput1.0-212[weightinput1.0-212 -> data 1.0 -> grad -0.0]-->*9[*]
-    *466[*]-->activation693[activation693 -> data -0.6 -> grad 0]
-    activation212916[activation212]-->weightinput-1.0-212[weightinput-1.0-212 -> data -1.0 -> grad -0.0]
-    *225[*]-->activation693[activation693 -> data -0.6 -> grad 0]
-    weightinput3.0-678[weightinput3.0-678 -> data 3.0 -> grad 0.0]-->*645[*]
-    +647[+]-->add678[add678 -> data 0.5073179151388665 -> grad 0.7268208486113363]
-    *610[*]-->activation212[activation212 -> data 0.6 -> grad 0]
-    *445[*]-->activation634[activation634 -> data 0.6 -> grad 0]
-    tanh294[tanh]-->ypred212[ypred212 -> data 0.7716722471896521 -> grad 1]
-    weightinput-1.0-212[weightinput-1.0-212 -> data -1.0 -> grad -0.0]-->*610[*]
-    activation212444[activation212]-->weightinput1.0-212[weightinput1.0-212 -> data 1.0 -> grad -0.0]
-    activation678214[activation678]-->weightinput0.5-678[weightinput0.5-678 -> data 0.5 -> grad -0.0]
-    bias808[bias808 -> data 0.9 -> grad 0.2401874934793421]-->+74[+]
-    bias808[bias808 -> data 0.9 -> grad 0.2401874934793421]-->+647[+]
-    bias808[bias808 -> data 0.9 -> grad 0.2401874934793421]-->+985[+]
-    bias808[bias808 -> data 0.9 -> grad 0.2401874934793421]-->+287[+]
-    activation693[activation693 -> data -0.6 -> grad 0]-->+985[+]
-    tanh477[tanh]-->ypred634[ypred634 -> data 0.6397830512740043 -> grad 1]
-    weight664[weight664 -> data -0.6 -> grad -0.0]-->*678[*]
-    weight664[weight664 -> data -0.6 -> grad -0.0]-->*889[*]
-    weight664[weight664 -> data -0.6 -> grad -0.0]-->*466[*]
-    weight664[weight664 -> data -0.6 -> grad -0.0]-->*610[*]
-    ypred693[ypred693 -> data 0.004615819148650599 -> grad 1]-->loss656[loss]
-    activation678[activation678 -> data -0.3 -> grad 0]-->+647[+]
-    activation634598[activation634]-->weightinput3.0-634[weightinput3.0-634 -> data 3.0 -> grad -0.0]
-    add678[add678 -> data 0.5073179151388665 -> grad 0.7268208486113363]-->tanh284[tanh]
-    activation634607[activation634]-->weightinput-1.0-634[weightinput-1.0-634 -> data -1.0 -> grad -0.0]
-    *165[*]-->activation634[activation634 -> data 0.6 -> grad 0]
-    ypred678[ypred678 -> data 0.4226654296858209 -> grad 1]-->loss656[loss]
-    weight677[weight677 -> data 0.07 -> grad 0.0]-->*165[*]
-    weight677[weight677 -> data 0.07 -> grad 0.0]-->*645[*]
-    weight677[weight677 -> data 0.07 -> grad 0.0]-->*225[*]
-    weight677[weight677 -> data 0.07 -> grad 0.0]-->*750[*]
-    add634[add634 -> data 0.9047278962952275 -> grad 0.45272103704772404]-->tanh477[tanh]
-    weightinput1.0-693[weightinput1.0-693 -> data 1.0 -> grad -0.0]-->*405[*]
-    weightinput1.0-693[weightinput1.0-693 -> data 1.0 -> grad -0.0]-->*466[*]
-    weightinput0.5-693[weightinput0.5-693 -> data 0.5 -> grad 0.0]-->*225[*]
-    activation678457[activation678]-->weightinput1.0-678[weightinput1.0-678 -> data 1.0 -> grad -0.0]
-    ypred634[ypred634 -> data 0.6397830512740043 -> grad 1]-->loss656[loss]
-    weightinput2.0-634[weightinput2.0-634 -> data 2.0 -> grad 0.0]-->*165[*]
-    activation693620[activation693]-->weightinput1.0-693[weightinput1.0-693 -> data 1.0 -> grad -0.0]
-    weight520[weight520 -> data -0.23 -> grad 0.0]-->*445[*]
-    weight520[weight520 -> data -0.23 -> grad 0.0]-->*387[*]
-    weight520[weight520 -> data -0.23 -> grad 0.0]-->*405[*]
-    weight520[weight520 -> data -0.23 -> grad 0.0]-->*9[*]
-    activation678677[activation678]-->weightinput3.0-678[weightinput3.0-678 -> data 3.0 -> grad 0.0]
-    *387[*]-->activation678[activation678 -> data -0.3 -> grad 0]
-    activation212908[activation212]-->weightinput1.0-212[weightinput1.0-212 -> data 1.0 -> grad -0.0]
-    ypred212[ypred212 -> data 0.7716722471896521 -> grad 1]-->loss656[loss]
-    *750[*]-->activation212[activation212 -> data 0.6 -> grad 0]
+    xs-input-1.0-758[xs-input-1.0-758 -> data -1.0 -> grad -0.0]-->*478[*]
+    activation837[activation837 -> data -0.01 -> grad 0]-->+287[+]
+    *924[*]-->activation837[activation837 -> data -0.01 -> grad 0]
+    xs-input3.0-837[xs-input3.0-837 -> data 3.0 -> grad -0.0]-->*924[*]
+    add166[add166 -> data 1.8199999999999998 -> grad 0.09970564632537582]-->tanh574[tanh]
+    tanh878[tanh]-->ypred758[ypred758 -> data 0.6858090622290945 -> grad 1]
+    input-weight852[input-weight852 -> data 0.74 -> grad 0.0]-->*660[*]
+    input-weight852[input-weight852 -> data 0.74 -> grad 0.0]-->*892[*]
+    input-weight852[input-weight852 -> data 0.74 -> grad 0.0]-->*603[*]
+    input-weight852[input-weight852 -> data 0.74 -> grad 0.0]-->*493[*]
+    xs-input-1.0-166[xs-input-1.0-166 -> data -1.0 -> grad -0.0]-->*206[*]
+    tanh855[tanh]-->ypred72[ypred72 -> data 0.781806357608774 -> grad 1]
+    *206[*]-->activation166[activation166 -> data 0.02 -> grad 0]
+    activation72859[activation72]-->xs-input0.5-72[xs-input0.5-72 -> data 0.5 -> grad -0.0]
+    activation166[activation166 -> data 0.02 -> grad 0]-->+816[+]
+    *603[*]-->activation72[activation72 -> data -0.02 -> grad 0]
+    +309[+]-->add758[add758 -> data 0.84 -> grad 0.52966593016445]
+    +287[+]-->add837[add837 -> data -0.19000000000000006 -> grad 0.9647513621820634]
+    activation837265[activation837]-->xs-input0.5-837[xs-input0.5-837 -> data 0.5 -> grad -0.0]
+    activation72[activation72 -> data -0.02 -> grad 0]-->+939[+]
+    xs-input1.0-758[xs-input1.0-758 -> data 1.0 -> grad 0.0]-->*853[*]
+    xs-input1.0-758[xs-input1.0-758 -> data 1.0 -> grad 0.0]-->*493[*]
+    activation166681[activation166]-->xs-input2.0-166[xs-input2.0-166 -> data 2.0 -> grad -0.0]
+    activation16695[activation166]-->xs-input-1.0-166[xs-input-1.0-166 -> data -1.0 -> grad -0.0]
+    activation758[activation758 -> data 0.02 -> grad 0]-->+309[+]
+    xs-input0.5-72[xs-input0.5-72 -> data 0.5 -> grad -0.0]-->*250[*]
+    *892[*]-->activation837[activation837 -> data -0.01 -> grad 0]
+    activation837426[activation837]-->xs-input3.0-837[xs-input3.0-837 -> data 3.0 -> grad -0.0]
+    activation16632[activation166]-->xs-input3.0-166[xs-input3.0-166 -> data 3.0 -> grad 0.0]
+    *336[*]-->activation166[activation166 -> data 0.02 -> grad 0]
+    activation758553[activation758]-->xs-input1.0-758[xs-input1.0-758 -> data 1.0 -> grad 0.0]
+    ypred758[ypred758 -> data 0.6858090622290945 -> grad 1]-->loss121[loss]
+    tanh574[tanh]-->ypred166[ypred166 -> data 0.9488384233759846 -> grad 1]
+    xs-input1.0-837[xs-input1.0-837 -> data 1.0 -> grad 0.0]-->*892[*]
+    activation758960[activation758]-->xs-input-1.0-758[xs-input-1.0-758 -> data -1.0 -> grad -0.0]
+    activation72628[activation72]-->xs-input1.0-72[xs-input1.0-72 -> data 1.0 -> grad -0.0]
+    ypred837[ypred837 -> data -0.18774620586828542 -> grad 1]-->loss121[loss]
+    *493[*]-->activation758[activation758 -> data 0.02 -> grad 0]
+    input-bias781[input-bias781 -> data 0.58 -> grad 0.52966593016445]-->+816[+]
+    input-bias781[input-bias781 -> data 0.58 -> grad 0.52966593016445]-->+287[+]
+    input-bias781[input-bias781 -> data 0.58 -> grad 0.52966593016445]-->+939[+]
+    input-bias781[input-bias781 -> data 0.58 -> grad 0.52966593016445]-->+309[+]
+    input-weight712[input-weight712 -> data -0.02 -> grad -0.0]-->*206[*]
+    input-weight712[input-weight712 -> data -0.02 -> grad -0.0]-->*591[*]
+    input-weight712[input-weight712 -> data -0.02 -> grad -0.0]-->*777[*]
+    input-weight712[input-weight712 -> data -0.02 -> grad -0.0]-->*478[*]
+    xs-input0.5-837[xs-input0.5-837 -> data 0.5 -> grad -0.0]-->*591[*]
+    add72[add72 -> data 1.0499999999999998 -> grad 0.3887788192025017]-->tanh855[tanh]
+    activation758406[activation758]-->xs-input1.0-758[xs-input1.0-758 -> data 1.0 -> grad 0.0]
+    xs-input2.0-166[xs-input2.0-166 -> data 2.0 -> grad -0.0]-->*336[*]
+    ypred166[ypred166 -> data 0.9488384233759846 -> grad 1]-->loss121[loss]
+    activation72702[activation72]-->xs-input1.0-72[xs-input1.0-72 -> data 1.0 -> grad -0.0]
+    activation837563[activation837]-->xs-input1.0-837[xs-input1.0-837 -> data 1.0 -> grad 0.0]
+    loss121[loss]-->mse[mse -> data 3.9359235743964285 -> grad 1]
+    +939[+]-->add72[add72 -> data 1.0499999999999998 -> grad 0.3887788192025017]
+    add758[add758 -> data 0.84 -> grad 0.52966593016445]-->tanh878[tanh]
+    *250[*]-->activation72[activation72 -> data -0.02 -> grad 0]
+    xs-input1.0-72[xs-input1.0-72 -> data 1.0 -> grad -0.0]-->*603[*]
+    xs-input1.0-72[xs-input1.0-72 -> data 1.0 -> grad -0.0]-->*777[*]
+    ypred72[ypred72 -> data 0.781806357608774 -> grad 1]-->loss121[loss]
+    input-weight228[input-weight228 -> data -0.5 -> grad 0.0]-->*336[*]
+    input-weight228[input-weight228 -> data -0.5 -> grad 0.0]-->*924[*]
+    input-weight228[input-weight228 -> data -0.5 -> grad 0.0]-->*250[*]
+    input-weight228[input-weight228 -> data -0.5 -> grad 0.0]-->*853[*]
+    add837[add837 -> data -0.19000000000000006 -> grad 0.9647513621820634]-->tanh300[tanh]
+    +816[+]-->add166[add166 -> data 1.8199999999999998 -> grad 0.09970564632537582]
+    *853[*]-->activation758[activation758 -> data 0.02 -> grad 0]
+    *777[*]-->activation72[activation72 -> data -0.02 -> grad 0]
+    *660[*]-->activation166[activation166 -> data 0.02 -> grad 0]
+    *478[*]-->activation758[activation758 -> data 0.02 -> grad 0]
+    *591[*]-->activation837[activation837 -> data -0.01 -> grad 0]
+    xs-input3.0-166[xs-input3.0-166 -> data 3.0 -> grad 0.0]-->*660[*]
+    tanh300[tanh]-->ypred837[ypred837 -> data -0.18774620586828542 -> grad 1]
 ```
 
 <!-- livebook:{"break_markdown":true} -->
