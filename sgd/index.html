@@ -31,7 +31,6 @@ class: center, middle
 
 1. Welcome
 1. Intro
-1. 10k Foot View
 1. Why?
 1. First Principle
 1. Recipes
@@ -59,32 +58,61 @@ class: center, middle
 
 ---
 
-# 10k Foot View
+# Learning From First Principles
 
-
-![png](images/nn.png)
-
----
-
-# Why Learn SGD?
-
---
-
-It's arguably the most important algorithm in machine learning.
-
-
---
-
-SGD is the building block of deep neural networks. When ChatGPT predicts the next word in a sequence, a form of SGD was used the train the model.
+![svg](images/before.jpeg)
 
 ---
 
 # Learning From First Principles
 
-- insert painting 1
+![svg](images/after.jpeg)
 
-- insert last painting
 
+# 10k Foot View
+
+![png](images/nn.png)
+
+---
+
+# What does SGD mean?
+
+--
+
+## Stochastic:
+- random
+
+--
+
+## Gradient:
+- slope of a function
+
+--
+
+## Descent:
+- moving downwards
+
+---
+
+## SGD in Action
+
+![svg](images/sgd.gif)
+
+---
+
+# Why Learn Stochastic Gradient Descent?
+
+--
+
+- SGD is the building block of deep neural networks 
+
+--
+
+- SGD is arguably the most important piece of deep neural networks
+
+--
+
+- When ChatGPT predicts the next word in a sequence, a form of SGD was used the train the model.
 
 ---
 
@@ -128,7 +156,6 @@ In other words, the derivative tells us the sensitivity of the function to chang
 
 ### Applied in SGD
 
-
 - we will use this fundamental rule of calculus to calculate the gradient of a neural network.
 
 --
@@ -147,105 +174,333 @@ In other words, the derivative tells us the sensitivity of the function to chang
 
 "If a car travels twice as fast as a bicycle and the bicycle is four times as fast as a walking man, then the car travels 2 × 4 = 8 times as fast as the man." - [George F. Simmons](https://en.wikipedia.org/wiki/Chain_rule)
 
-
 --
 
 We can take advatage of this rule to calculate the gradient of a neural network via the derivative.
 
 ---
 
-# SGD Ingredients
+# LiveBook Deep Dive
 
-## The Chain Rule
+## Example Node Struct
 
-![png](images/chainrule.png)
-
-### Applied in SGD
-
-- if the nodes are added (gradient values flow backward to previous nodes):
-
---
-
-c = a + b
-
---
-
-dc/da = 1
-
-dc/db = 1
+```elixir
+  @type t :: %Node{
+    data: Integer.t() | nil,
+    grad: Integer.t(),
+    label: String.t(),
+    _backward: fun(any),
+    _op: String.t(),
+    _children: list(Node{})
+  }
+```
 
 ---
 
-# SGD Ingredients
+# How is SGD using derivatives?
 
-## The Chain Rule
+## Node Module API
 
-![png](images/chainrule.png)
+### Addition
 
-### Applied in SGD
+```elixir
+a = %Node1{data: 2, label: "a"}
+b = %Node1{data: -3, label: "b"}
+Node1.add(a, b)
 
-- if the nodes are multiplied (node gradient values are dependent upon the gradient value * the derivative of the other nodes gradient):
+# outputs -1 in data field
+```
 
---
+---
 
-c = a*b
+# How is SGD using derivatives?
 
-da/dc = b
+## Node Module API
 
-db/dc = a
+### Multiplication
+
+```elixir
+a = %Node1{data: 2, label: "a"}
+b = %Node1{data: -3, label: "b"}
+Node1.mult(a, b)
+
+# outputs -6 in data field
+```
+
+---
+
+# How is SGD using derivatives?
+
+### Multiplication then Addition, Graphed
+
+![png](images/nodes.png)
+
+
+```elixir
+a = %Node1{data: 2, label: "a"}
+b = %Node1{data: -3, label: "b"}
+c = %Node1{data: 10, label: "c"}
+d = Node1.mult(a, b, "e") |> Node1.add(c, "d", 1)
+```
+
+---
+
+# How is SGD using derivatives?
+
+### In terms of a
+
+![png](images/nodes-back.png)
+![png](images/a.png)
+
+---
+
+# How is SGD using derivatives?
+
+### In terms of b
+
+![png](images/nodes-back.png)
+![png](images/b.png)
+
+---
+
+# How is SGD using derivatives?
+
+### In terms of c
+
+![png](images/nodes-back.png)
+![png](images/c.png)
 
 ---
 
 # Neural Network Ingredients
 
-## Weights 
-## Activations
-## Fordward Pass
-## Backward Pass
+### Weights and Bias
+### Activation
+### Learning Rate
+### Loss Function
+### Backpropagation
+### Forward Pass
 
+---
+
+# A Neuron
+
+![png](images/neuron.png)
+
+---
+
+# A Neuron
+
+### In code
+
+![png](images/wv.png)
+
+```elixir
+x1 = %Node1{data: 2.0, label: "x1"}
+x2 = %Node1{data: 0.0, label: "x2"}
+
+w1 = %Node1{data: -3.0, label: "w1"}
+w2 = %Node1{data: 1.0, label: "w2"}
+
+b = %Node1{data: 6.881373587019541, label: "b"}
+
+x1w1 = Node1.mult(x1, w1, "x1*w1")
+x2w2 = Node1.mult(x2, w2, "x2*w2")
+x1w1x2w2 = Node1.add(x1w1, x2w2, "x1*w1+x2*w2")
+n = Node1.add(x1w1x2w2, b, "n")
+o = Node1.tanh(n, "o", 1)
+```
+
+---
+
+# A Neural Network
 
 ![png](images/nn.png)
 
 ---
 
-# LiveBook Deep Dive
+# Nx: 
 
+### Numerical Elixir
 
-## Example Value Struct
+---
 
+# Node module in Nx
 
-```rb
-%Value{
-  data: 4,
-  grad: 0,
-  label: "d",
-  _backward: true,
-  _op: "+",
-  _prev: MapSet.new([
-    %Value{data: 10, grad: 0, label: "c", _backward: false, _op: "", _prev: MapSet.new([])},
-    %Value{
-      data: -6,
-      grad: 0,
-      label: "e",
-      _backward: true,
-      _op: "*",
-      _prev: MapSet.new([
-        %Value{data: -3, grad: 0, label: "b", _backward: false, _op: "", _prev: MapSet.new([])},
-        %Value{data: 2, grad: 0, label: "a", _backward: false, _op: "", _prev: MapSet.new([])}
-      ])
-    }
-  ])
-}
+```elixir
+x1 = Nx.tensor([2.0])
+x2 = Nx.tensor([0.0])
+
+w1 = Nx.tensor([-3.0])
+w2 = Nx.tensor([1.0])
+
+b = Nx.tensor([6.8813735870195432])
+
+x1w1 = Nx.multiply(x1,w1)
+x2w2 = Nx.multiply(x2, w2)
+
+output = x1w1 |> Nx.add(x2w2) |> Nx.add(b)
+Nx.tanh(output)
+```
+---
+
+# tanh function
+
+![png](images/tanh.png)
+
+--
+
+```elixir
+:math.tanh(-5) # -0.9999092042625951
+:math.tanh(-1) # -0.7615941559557649
+:math.tanh(0) # 0.0
+:math.tanh(1) # -0.7615941559557649
+:math.tanh(-5) # 0.9999092042625951
 ```
 
 ---
 
-## What is a DAG?
+# Weights/Bias
+
+- weights are random numbers that are multiplied by the input data
+
+
+```elixir
+  defn init_random_parameters do
+    w = Nx.random_normal({}, 0.0, 1.0)
+    b = Nx.random_normal({}, 0.0, 1.0)
+    {w, b}
+  end
+```
 
 --
 
-![png](images/nodes.png)
-- A graph made up of vertices and edges. The vertices are the boxes and the edges are the lines connecting the boxes.
+```elixir
+  activation = w * input + b
+```
+
+---
+
+# Activations
+
+- non-linear functions that are applied to the output of the weights + bias
+
+--
+
+- like tanh
+
+---
+
+# Learning Rate
+
+- a hyperparameter that controls how much to update the weights
+
+---
+
+# Learning Rate
+
+![png](images/lr-high.png)
+
+---
+
+# Learning Rate
+
+![png](images/lr-low.png)
+
+---
+
+# Loss Function
+
+- let's you know how far the prediction is off from the actual value
+
+--
+
+- mean squared error is a common loss function
+
+
+--
+
+```elixir
+  defn loss(params, x, y) do
+    y_hat = predict(params, x)
+
+    (y - y_hat)
+    |> Nx.pow(2)
+    |> Nx.mean()
+  end
+```
+
+---
+
+# Backpropagation
+
+- process of calculating the gradient of the neural network
+
+```elixir
+  defn backprop({w, b} = params, x, y) do
+    {grad_w, grad_b} = grad(params, &loss(&1, x, y))
+
+    {
+      w - grad_w * @learning_rate,
+      b - grad_b * @learning_rate
+    }
+  end
+```
+
+---
+
+# Forward Pass
+
+- loop accumulating the changes in gradients in the network
+
+
+```elixir
+  def train(data, epochs \\ 1000) do
+    params = init_random_parameters()
+
+    {x, y} = Enum.unzip(data)
+
+    x = Nx.tensor(x)
+    y = Nx.tensor(y)
+
+    Enum.reduce(1..epochs, params, fn _i, acc ->
+      backprop(acc, x, y)
+    end)
+  end
+ ``` 
+
+---
+
+# Axon
+
+### A high-level interface for creating neural network models
+
+---
+
+# Axon
+
+```elixir
+x1_input = Axon.input("x1", shape: {nil, 1})
+
+model =
+  x1_input
+  |> Axon.dense(4, activation: :relu)
+  |> Axon.dense(1, activation: :tanh)
+
+batch_size = 64
+
+data =
+  Stream.repeatedly(fn ->
+    x = Nx.random_uniform({batch_size, 1}, 0, 50)
+
+    {%{"x1" => x}, Nx.tanh(x)}
+  end)
+
+params =
+  model
+  |> Axon.Loop.trainer(:mean_squared_error, :sgd)
+  |> Axon.Loop.run(data, %{}, epochs: 100, iterations: 1000)
+```
 
 ---
 
@@ -257,8 +512,8 @@ db/dc = a
 
 - [The spelled-out intro to neural networks and backpropagation: building micrograd](https://www.youtube.com/watch?v=VMj-3S1tku0) -- Andrej Karpathy
 - [fast.ai](https://www.fast.ai/) -- Jeremy Howard
+- [How does a neural net really work?](https://www.kaggle.com/code/jhoward/how-does-a-neural-net-really-work) -- Jeremy Howard
 - [My LiveBook GH Repo](https://github.com/iacutone/presentations/sgd)
-
 
 ---
 
@@ -274,3 +529,11 @@ class: center, middle
     </script>
   </body>
 </html>
+
+
+<style>
+  img {
+    max-width: 75%;
+    max-height: 75%;
+  }
+</style>

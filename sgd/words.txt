@@ -1,0 +1,69 @@
+Hi friends, thank you for joining me this afternoon.
+
+The title of my presentation is learn gradient descent in 30 minutes. Please click on this QR code for a link to my presentation. I created the QR code with DiffusionBee, an OSX program which allows the user to create pictures based on text input. It also has a feature where you can use a base photo for inspiration, in my case a QR code.
+
+We will be exploring the intracacies of gradient descent through first principles. From this point, I will refer to stochastic gradient descent as SGD which is a common acronym.
+
+But before we start, a little introduction of myself.
+
+My name is Eric. I have been developing web applications for around 10 years. I currently write mostly Elixir code at cars.com.
+
+In my free time, you can typically find me at the park with my daughter Giorgina. When I am not spending time with my daughter, I enjoy cooking and painting.
+
+Furthermore, I try to stay moderately fit and have developed a weekly running and powerlifting habit. 
+
+During this conference, I'd be happy to discuss, cooking, painting, fitness or toddlers
+
+I previously mentioned we would be learning SGD from first principles. I believe people can learn things deeply and clearly from the first principles approach.
+
+What do I mean by first principles? I mean that we will take the simplest layer of a problem and continue to add additional complexity on top. This has very strong correlations to our day jobs as software engineers.
+
+A personal example of leanring from first principles is when I decided to learn to paint. At the beginning we started by painting solid grey scale blocks.
+
+With the foundation, we continually add layers of complexity. After you learn to accurately paint solid colors with no specs of canvas, you learn how lights and shadows interact. Then you learn how to paint gradients to give the allution of depth and curvature. The next layer is adding highlights and ??? in order to more accurately render reality.
+
+After painting with grey scales for around a year, I graduated onto painting in colors. 
+
+Here is a recent paiting I completed for class.
+
+Let's apply similar principles to SGD and start with the definition. Stochastic is mathematical term which simply means random. Gradient is the slope of a function. And descent means moving downwards. It took me some time to fully understand SGD. Throughout my learning journey, two classes stand out to me as amazing resources. Fast.ai by Jeremy Howard and the micrograd framework by Andrej Karparthy. These classes were the inspiration of the LiveBook code.
+
+I think this picture aptly describes the action of SGD in a graphical form.
+
+In essence, SGD is a function to find the minimum of a function.
+
+Now, let's explore the ingredients of SGD in Elixir. The exmaples in this presentation are accessible from the LiveBook.
+
+Jeremy Howard quote
+
+Andrej Karpathy quote
+
+The base of building an SGD algorithm is the Node struct. This struct contains a tree structure whereby a Node struct contains a list previous value structs. The struct is composes of publicly accessible fields, data which contains the value of a give node. The operation such as addition or multiplication. A label which is a helper key/value pair which we will use to graph what the Node tree looks like. The Node also contains fields not intended to be interacted with or set from the outside. These fields include an anonymous backward function and a gradient. The backward function information necessary to calculate the gradient of the Node tree when we recurse through the tree.
+
+
+With the Node tree in place, let's explore some simple examples. This is how you add two nodes (EXAMPLE)
+
+And, this is how you multiply two nodes (EXAMPLE)
+
+
+This is what a node tree looks like if we multiple two nodes and then add the results together. (EXAMPLE)
+
+In order to calculate gradients, we will need to take a small detour into the world of calculus. But don't be afraid, the math involved is quite simple. This is a definition for a derivative. It's telling the function's sensitivity to change. Since have a Node tree, the gradients of one node will affect other previous nodes in the tree. Using the chain rule, we can determine how changing one node will effect another node in the system. A good and intuitive exmaple from Wikipedia states "If a car travels twice as fast as a bicycle and the bicycle is four times as fast as a walking man, then the car travels 2 × 4 = 8 times as fast as the man."
+
+In terms of the Node struct, questions we need to answer are what does it mean in terms of the gradient when two nodes are added together. The gradients "flow" backward. Additionally, what does it mean when nodes are multiplies together. It means the outcoming node is multiplies by the other incoming node's data value. I think the node graph does a good job exemplifying these ideas. 
+
+
+We can now proceed to the next building block of a neural network. For each Node's data value, we will assign a random weight. Here is an example of two data points with their associated weights (EXAMPLE)
+
+
+At this point, we can begin to ask some interesting questions such as what is the weight doing, what is the bias doing and what is tanh doing. Our Node struct is modeled after a neuron, an allegory to how the brain's neuron functions. The weights assigned to the data points. In SGD parlance, the weights multiplied by the data are called parameters. The bias is how "trigger happy" our function is firing. Tanh is a function which introduces a non-linearity meaning it squashes the results of the output between -1 and 1 (EXAMPLE). WHY DO WE NEED A non-linearity?
+
+Now, let's introduct Nx and Axon. Nx is a numerical library in Elxir allowing as the ability to perform mathematical expressions similar to the Node struct from above. I chose to introduce Nx at the point to focus on how SGD works instead of getting bogged down in the internals of Axon. Axon is a deep learning library built on top of Nx which is similar to PyTorch. Pytorch is a library which allows us to perform differentiation, a way to update the gradient values from out Node struct.
+
+Bring this back to Ws, Xs and Bs, the job of the SGD algorithm is to find the best W and B values to fit a certain function result or y.
+
+
+
+
+
+
