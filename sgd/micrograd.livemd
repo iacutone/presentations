@@ -4,11 +4,12 @@
 Mix.install([
   {:axon, "~> 0.6.0"},
   :dg,
-  # {:exla, "~> 0.4.0"},
+  {:scholar, "~> 0.1"},
+  {:exla, ">= 0.0.0"},
   {:kino_vega_lite, "~> 0.1.9"}
 ])
 
-# Nx.Defn.default_options(compiler: EXLA)
+Nx.global_default_backend(EXLA.Backend)
 alias VegaLite, as: Vl
 ```
 
@@ -291,46 +292,6 @@ graph LR
     +920[+]-->d[d -> data 4 -> grad -2]
 ```
 
-## Value Tree with Weights
-
-```elixir
-x1 = %Node1{data: 2.0, label: "x1"}
-x2 = %Node1{data: 0.0, label: "x2"}
-
-w1 = %Node1{data: -3.0, label: "w1"}
-w2 = %Node1{data: 1.0, label: "w2"}
-
-b = %Node1{data: 6.881373587019541, label: "b"}
-
-x1w1 = Node1.mult(x1, w1, "x1*w1")
-x2w2 = Node1.mult(x2, w2, "x2*w2")
-x1w1x2w2 = Node1.add(x1w1, x2w2, "x1*w1+x2*w2")
-n = Node1.add(x1w1x2w2, b, "n")
-o = Node1.tanh(n, "o", 1)
-
-o
-|> Node1.backward()
-|> Graph.draw_dot()
-```
-
-```mermaid
-graph LR
-    +417[+]-->x1*w1+x2*w2[x1*w1+x2*w2 -> data -6.0 -> grad 0.5]
-    b[b -> data 6.881373587019541 -> grad 0.50]-->+887[+]
-    x1[x1 -> data 2.0 -> grad -1.5]-->*191[*]
-    *558[*]-->x2*w2[x2*w2 -> data 0.0 -> grad 0.5]
-    w2[w2 -> data 1.0 -> grad 0.0]-->*558[*]
-    x1*w1[x1*w1 -> data -6.0 -> grad 0.5]-->+417[+]
-    x1*w1+x2*w2[x1*w1+x2*w2 -> data -6.0 -> grad 0.5]-->+887[+]
-    tanh583[tanh]-->o[o -> data 0.7071067811865467 -> grad 1]
-    +887[+]-->n[n -> data 0.8813735870195414 -> grad 0.5]
-    *191[*]-->x1*w1[x1*w1 -> data -6.0 -> grad 0.5]
-    w1[w1 -> data -3.0 -> grad 1.0]-->*191[*]
-    n[n -> data 0.8813735870195414 -> grad 0.5]-->tanh583[tanh]
-    x2*w2[x2*w2 -> data 0.0 -> grad 0.5]-->+417[+]
-    x2[x2 -> data 0.0 -> grad 0.5]-->*558[*]
-```
-
 ## Intro to Nx
 
 ```elixir
@@ -349,7 +310,126 @@ output = x1w1 |> Nx.add(x2w2) |> Nx.add(b)
 Nx.tanh(output)
 ```
 
-## Visualizing the tanh Function
+## Visualizing a Linear Function: y = 2x
+
+```elixir
+defmodule Mathy do
+  def actual(x) do
+    2 * x
+  end
+end
+
+chart =
+  Vl.new(width: 400, height: 400)
+  |> Vl.mark(:line)
+  |> Vl.encode_field(:x, "x", type: :quantitative)
+  |> Vl.encode_field(:y, "y", type: :quantitative)
+  |> Kino.VegaLite.new()
+  |> Kino.render()
+
+for i <- -5..5 do
+  point = %{x: i, y: Mathy.actual(i)}
+  Kino.VegaLite.push(chart, point)
+  Process.sleep(25)
+end
+```
+
+## Solving for a linear function using Nx
+
+```elixir
+defmodule Solver do
+  import Nx.Defn
+
+  @learning_rate 0.01
+  @batch_size 64
+
+  defn predict({w, b}, x) do
+    w * x + b
+  end
+
+  defn mse(activations, x, y) do
+    y_hat = predict(activations, x)
+
+    (y - y_hat)
+    |> Nx.pow(2)
+    |> Nx.mean()
+  end
+
+  defn update({w, b} = activations, x, y) do
+    {grad_w, grad_b} = grad(activations, &mse(&1, x, y))
+
+    {
+      w - grad_w * @learning_rate,
+      b - grad_b * @learning_rate
+    }
+  end
+
+  def train(data, epochs \\ 100) do
+    Enum.reduce(1..epochs, random_parameters(), fn _i, acc ->
+      data
+      |> Enum.take(@batch_size)
+      |> Enum.reduce(acc, fn batch, activations ->
+        {x, y} = Enum.unzip(batch)
+        x = Nx.tensor(x)
+        y = Nx.tensor(y)
+        update(activations, x, y)
+      end)
+    end)
+  end
+
+  def random_parameters do
+    key = Nx.Random.key(12)
+    {w, _new_key} = Nx.Random.normal(key, 0.0, 1.0)
+    {b, _new_key} = Nx.Random.normal(key, 0.0, 1.0)
+
+    {w, b}
+  end
+
+  def generate_data do
+    num = :rand.uniform()
+    {x, y} = {num, Mathy.actual(num)}
+    {Nx.tensor(x), Nx.tensor(y)}
+  end
+end
+```
+
+## Manual Updates
+
+```elixir
+# initialize a random w and b
+activations = Solver.random_parameters()
+```
+
+```elixir
+# generate some data we know is true {1, 2}
+# when x is 1, y is 2
+
+{x, y} = Solver.generate_data()
+```
+
+```elixir
+Solver.update(activations, x, y)
+```
+
+## Train In a Loop
+
+```elixir
+data =
+  Stream.repeatedly(fn ->
+    Stream.map(0..64, fn _i ->
+      num = :rand.uniform() * 10
+      {num, Mathy.actual(num)}
+    end)
+  end)
+
+model = Solver.train(data)
+```
+
+```elixir
+Solver.predict(model, 2)
+```
+
+## Tanh Graphed
 
 ```elixir
 chart =
@@ -367,88 +447,11 @@ for i <- -10..10 do
 end
 ```
 
-```elixir
-IO.inspect(:math.tanh(-5))
-IO.inspect(:math.tanh(-1))
-IO.inspect(:math.tanh(0))
-IO.inspect(:math.tanh(-1))
-IO.inspect(:math.tanh(5))
-```
-
-## Solving for tanh using Nx
-
-```elixir
-defmodule Solver do
-  import Nx.Defn
-
-  @learning_rate 0.05
-
-  defn predict({w, b}, x) do
-    activation = w * x + b
-    Nx.tanh(activation)
-  end
-
-  defn loss(params, x, y) do
-    y_hat = predict(params, x)
-
-    (y - y_hat)
-    |> Nx.pow(2)
-    |> Nx.mean()
-  end
-
-  defn backprop({w, b} = params, x, y) do
-    {grad_w, grad_b} = grad(params, &loss(&1, x, y))
-
-    {
-      w - grad_w * @learning_rate,
-      b - grad_b * @learning_rate
-    }
-  end
-
-  defn init_random_parameters do
-    w = Nx.random_normal({}, 0.0, 1.0)
-    b = Nx.random_normal({}, 0.0, 1.0)
-
-    {w, b}
-  end
-
-  def train(data, epochs \\ 1000) do
-    params = init_random_parameters()
-
-    {x, y} = Enum.unzip(data)
-
-    x = Nx.tensor(x)
-    y = Nx.tensor(y)
-
-    Enum.reduce(1..epochs, params, fn _i, acc ->
-      backprop(acc, x, y)
-    end)
-  end
-end
-```
-
-```elixir
-data =
-  Enum.reduce(-20..20, [], fn i, acc ->
-    i = i / 100
-    acc ++ [{i, :math.tanh(i)}]
-  end)
-
-params = Solver.train(data)
-```
-
-```elixir
-Solver.predict(params, -5.0)
-```
-
 ## Solving for tanh using Axon
 
 ```elixir
-# shape of the input
-x1_input = Axon.input("x1", shape: {nil, 1})
-
 model =
-  x1_input
+  Axon.input("data")
   |> Axon.dense(4, activation: :relu)
   |> Axon.dense(1, activation: :tanh)
 
@@ -456,22 +459,21 @@ batch_size = 64
 
 data =
   Stream.repeatedly(fn ->
-    x = Nx.random_uniform({batch_size, 1}, 0, 50)
+    {x, _next_key} =
+      12
+      |> Nx.Random.key()
+      |> Nx.Random.normal(-5.0, 5.0, shape: {64, 1})
 
-    {%{"x1" => x}, Nx.tanh(x)}
+    y = Nx.tanh(x)
+    {x, y}
   end)
 
 params =
   model
   |> Axon.Loop.trainer(:mean_squared_error, :sgd)
-  |> Axon.Loop.metric(:accuracy)
   |> Axon.Loop.run(data, %{}, epochs: 100, iterations: 100)
-
-Axon.predict(model, params, %{
-  "x1" => Nx.tensor([[0.5]])
-})
 ```
 
 ```elixir
-:math.tanh(0.5)
+Axon.predict(model, params, Nx.tensor([[1]]))
 ```

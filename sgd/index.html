@@ -21,20 +21,13 @@
 
 class: center, middle
 
-# Learn Stochastic Gradient Descent in 30 Minutes
-
 ![jpeg](images/qr_code.png)
 
 ---
 
-# Agenda
+class: center, middle
 
-1. Welcome
-1. Intro
-1. Why?
-1. First Principle
-1. Recipes
-1. Conclusion
+# Learn Stochastic Gradient Descent in 30 Minutes
 
 ---
 
@@ -58,6 +51,28 @@ class: center, middle
 
 ---
 
+# Why Learn SGD?
+
+--
+
+- SGD is the building block of deep neural networks 
+
+--
+
+- SGD is arguably the most important piece of deep neural networks
+
+--
+
+- "Micrograd is what you need to train neural networks and everything else is just efficiency" - Andrej Karpathy
+
+--
+
+```elixir
+Axon.Loop.trainer(:mean_squared_error, :sgd)
+```
+
+---
+
 # Learning From First Principles
 
 ![svg](images/before.jpeg)
@@ -66,12 +81,13 @@ class: center, middle
 
 # Learning From First Principles
 
+![svg](images/bird.png)
+
+---
+
+# Learning From First Principles
+
 ![svg](images/after.jpeg)
-
-
-# 10k Foot View
-
-![png](images/nn.png)
 
 ---
 
@@ -94,29 +110,24 @@ class: center, middle
 
 ---
 
+# What does SGD mean?
+
+- SGD is an optimization function that finds the lowest point of a function
+
+---
+
 ## SGD in Action
 
 ![svg](images/sgd.gif)
 
 ---
+class: center, middle
 
-# Why Learn Stochastic Gradient Descent?
-
---
-
-- SGD is the building block of deep neural networks 
-
---
-
-- SGD is arguably the most important piece of deep neural networks
-
---
-
-- When ChatGPT predicts the next word in a sequence, a form of SGD was used the train the model.
+![jpeg](images/qr_code.png)
 
 ---
 
-# SGD Ingredients
+# Calculus Ingredients
 
 ## The Derivative
 
@@ -124,27 +135,31 @@ class: center, middle
 
 --
 
-y = 5x
+y = 2x
 
 --
 
-dy/dx = (5(x+h) - 5x) / h 
+dy/dx = (2(x+h) - 2x) / h 
 
 --
 
-      = 5x + 5h - 5x / h
+      = 2x + 2h - 2x / h
 
 --
 
-      = 5h / h
+      = 2h / h
 
 --
 
-      = 5
+      = 2
 
---
+- In other words, the derivative tells us the sensitivity of the function to change
 
-In other words, the derivative tells us the sensitivity of the function to change.
+---
+
+# Calculus Ingredients
+
+.lg[![png](images/2x-function.png)]
 
 ---
 
@@ -156,15 +171,11 @@ In other words, the derivative tells us the sensitivity of the function to chang
 
 ### Applied in SGD
 
-- we will use this fundamental rule of calculus to calculate the gradient of a neural network.
-
---
-
-- we will change _h_ a little to determine how a small changes effects the gradient, does the gradient increase or decrease?
+- we will use this fundamental rule of calculus to calculate the gradient of a neural network
 
 ---
 
-# SGD Ingredients
+# Calculus Ingredients
 
 ## The Chain Rule
 
@@ -176,7 +187,7 @@ In other words, the derivative tells us the sensitivity of the function to chang
 
 --
 
-We can take advatage of this rule to calculate the gradient of a neural network via the derivative.
+We can take advatage of the chain rule to calculate the gradient of a neural network via the derivative.
 
 ---
 
@@ -191,9 +202,11 @@ We can take advatage of this rule to calculate the gradient of a neural network 
     label: String.t(),
     _backward: fun(any),
     _op: String.t(),
-    _children: list(Node{})
+    _children: list(%Node{})
   }
 ```
+
+- it's a tree data structure with childred nodes
 
 ---
 
@@ -208,7 +221,7 @@ a = %Node1{data: 2, label: "a"}
 b = %Node1{data: -3, label: "b"}
 Node1.add(a, b)
 
-# outputs -1 in data field
+# inserts a new Node with data value of -1
 ```
 
 ---
@@ -224,7 +237,7 @@ a = %Node1{data: 2, label: "a"}
 b = %Node1{data: -3, label: "b"}
 Node1.mult(a, b)
 
-# outputs -6 in data field
+# inserts a new Node with data value of -6
 ```
 
 ---
@@ -233,9 +246,6 @@ Node1.mult(a, b)
 
 ### Multiplication then Addition, Graphed
 
-![png](images/nodes.png)
-
-
 ```elixir
 a = %Node1{data: 2, label: "a"}
 b = %Node1{data: -3, label: "b"}
@@ -243,169 +253,77 @@ c = %Node1{data: 10, label: "c"}
 d = Node1.mult(a, b, "e") |> Node1.add(c, "d", 1)
 ```
 
----
-
-# How is SGD using derivatives?
-
-### In terms of a
-
-![png](images/nodes-back.png)
-![png](images/a.png)
+.lg[![png](images/nodes.png)]
 
 ---
 
 # How is SGD using derivatives?
 
-### In terms of b
-
-![png](images/nodes-back.png)
-![png](images/b.png)
-
----
-
-# How is SGD using derivatives?
-
-### In terms of c
-
-![png](images/nodes-back.png)
-![png](images/c.png)
-
----
-
-# Neural Network Ingredients
-
-### Weights and Bias
-### Activation
-### Learning Rate
-### Loss Function
-### Backpropagation
-### Forward Pass
-
----
-
-# A Neuron
-
-![png](images/neuron.png)
-
----
-
-# A Neuron
-
-### In code
-
-![png](images/wv.png)
-
-```elixir
-x1 = %Node1{data: 2.0, label: "x1"}
-x2 = %Node1{data: 0.0, label: "x2"}
-
-w1 = %Node1{data: -3.0, label: "w1"}
-w2 = %Node1{data: 1.0, label: "w2"}
-
-b = %Node1{data: 6.881373587019541, label: "b"}
-
-x1w1 = Node1.mult(x1, w1, "x1*w1")
-x2w2 = Node1.mult(x2, w2, "x2*w2")
-x1w1x2w2 = Node1.add(x1w1, x2w2, "x1*w1+x2*w2")
-n = Node1.add(x1w1x2w2, b, "n")
-o = Node1.tanh(n, "o", 1)
-```
-
----
-
-# A Neural Network
-
-![png](images/nn.png)
+.lg[![png](images/grads.png)]
 
 ---
 
 # Nx: 
 
-### Numerical Elixir
+## Numerical Elixir
 
 ---
 
-# Node module in Nx
-
-```elixir
-x1 = Nx.tensor([2.0])
-x2 = Nx.tensor([0.0])
-
-w1 = Nx.tensor([-3.0])
-w2 = Nx.tensor([1.0])
-
-b = Nx.tensor([6.8813735870195432])
-
-x1w1 = Nx.multiply(x1,w1)
-x2w2 = Nx.multiply(x2, w2)
-
-output = x1w1 |> Nx.add(x2w2) |> Nx.add(b)
-Nx.tanh(output)
-```
----
-
-# tanh function
-
-![png](images/tanh.png)
-
---
-
-```elixir
-:math.tanh(-5) # -0.9999092042625951
-:math.tanh(-1) # -0.7615941559557649
-:math.tanh(0) # 0.0
-:math.tanh(1) # -0.7615941559557649
-:math.tanh(-5) # 0.9999092042625951
-```
+![png](images/2x.png)
 
 ---
 
-# Weights/Bias
+# SGD Ingredients
 
-- weights are random numbers that are multiplied by the input data
-
-
-```elixir
-  defn init_random_parameters do
-    w = Nx.random_normal({}, 0.0, 1.0)
-    b = Nx.random_normal({}, 0.0, 1.0)
-    {w, b}
-  end
-```
-
---
-
-```elixir
-  activation = w * input + b
-```
+### x and b
+### Learning Rate
+### Loss Function
 
 ---
 
-# Activations
+# w and b
 
-- non-linear functions that are applied to the output of the weights + bias
+- randomly selected numbers that will be updated by SGD
 
---
 
-- like tanh
+```elixir
+defp random_parameters do
+  key = Nx.Random.key(12)
+  {w, _new_key} = Nx.Random.normal(key, 0.0, 1.0)
+  {b, _new_key} = Nx.Random.normal(key, 0.0, 1.0)
+
+  {w, b}
+end
+```
+
+- w and b are two random floats between 0 and 1
+
+```elixir
+{0.4221189078, 0.3289251856}
+```
 
 ---
 
 # Learning Rate
 
-- a hyperparameter that controls how much to update the weights
+- a hyperparameter that controls how much to update the w and b parameters
 
----
-
-# Learning Rate
-
-![png](images/lr-high.png)
+```elixir
+{w - grad_w * @learning_rate,
+b - grad_b * @learning_rate}
+```  
 
 ---
 
 # Learning Rate
 
 ![png](images/lr-low.png)
+
+---
+
+# Learning Rate
+
+![png](images/lr-high.png)
 
 ---
 
@@ -417,12 +335,11 @@ Nx.tanh(output)
 
 - mean squared error is a common loss function
 
-
 --
 
 ```elixir
-  defn loss(params, x, y) do
-    y_hat = predict(params, x)
+  defn mse(activations, x, y) do
+    y_hat = predict(activations, x)
 
     (y - y_hat)
     |> Nx.pow(2)
@@ -432,12 +349,22 @@ Nx.tanh(output)
 
 ---
 
-# Backpropagation
+![png](images/mse.png)
 
-- process of calculating the gradient of the neural network
+---
+
+# Loss Function
+
+![png](images/mse-1.png)
+
+---
+
+# Update
+
+- process of calculating the gradients and updating the w and b parameters
 
 ```elixir
-  defn backprop({w, b} = params, x, y) do
+  defn update({w, b} = params, x, y) do
     {grad_w, grad_b} = grad(params, &loss(&1, x, y))
 
     {
@@ -449,25 +376,40 @@ Nx.tanh(output)
 
 ---
 
-# Forward Pass
+# Update
 
-- loop accumulating the changes in gradients in the network
+![png](images/forward.png)
 
+---
+
+<video width="700" height="700" controls autoplay>
+  <source src="images/manual.mov" type="video/mp4">
+</video>
+
+---
+
+# Training - All Together Now
+
+- a convenience function to loop over the data and update the parameters (w and b)
 
 ```elixir
-  def train(data, epochs \\ 1000) do
-    params = init_random_parameters()
-
-    {x, y} = Enum.unzip(data)
-
-    x = Nx.tensor(x)
-    y = Nx.tensor(y)
-
-    Enum.reduce(1..epochs, params, fn _i, acc ->
-      backprop(acc, x, y)
+  def train(data, epochs \\ 100) do
+    Enum.reduce(1..epochs, random_parameters(), fn _i, acc ->
+      data
+      |> Enum.take(@batch_size)
+      |> Enum.reduce(acc, fn batch, activations ->
+          {x, y} = Enum.unzip(batch)
+          x = Nx.tensor(x)
+          y = Nx.tensor(y)
+          update(activations, x, y)
+        end)
     end)
   end
  ``` 
+
+---
+
+![png](images/fin.png)
 
 ---
 
@@ -476,6 +418,24 @@ Nx.tanh(output)
 ### A high-level interface for creating neural network models
 
 ---
+
+# A Neural Network
+
+![png](images/nn.png)
+
+---
+
+# Activations
+
+## tanh
+
+![png](images/tanh.png)
+
+- non-linear functions that are applied to the output of the weights + bias
+
+---
+
+
 
 # Axon
 
@@ -513,7 +473,8 @@ params =
 - [The spelled-out intro to neural networks and backpropagation: building micrograd](https://www.youtube.com/watch?v=VMj-3S1tku0) -- Andrej Karpathy
 - [fast.ai](https://www.fast.ai/) -- Jeremy Howard
 - [How does a neural net really work?](https://www.kaggle.com/code/jhoward/how-does-a-neural-net-really-work) -- Jeremy Howard
-- [My LiveBook GH Repo](https://github.com/iacutone/presentations/sgd)
+- [Up and Running Nx](https://dockyard.com/blog/2021/04/08/up-and-running-nx) -- Dockyard, Sean Moriarity
+- [My LiveBook GH Repo](https://github.com/iacutone/presentations/tree/master/sgd)
 
 ---
 
@@ -533,7 +494,13 @@ class: center, middle
 
 <style>
   img {
-    max-width: 75%;
-    max-height: 75%;
+    max-width: 85%;
+    max-height: 85%;
+ }
+
+  .lg img {
+    position: absolute;
+    object-fit: cover;
+    width: 100%;
   }
 </style>
