@@ -27,15 +27,19 @@ class: center, middle
 
 class: center, middle
 
-# Learn Stochastic Gradient Descent in 30 Minutes
+# Learn Stochastic Gradient Descent (SGD) In Under 30 Minutes
 
 ---
+
+class: center, middle
 
 # Welcome
 
 ![gif](images/hello.gif)
 
 ---
+
+class: center, middle
 
 # Welcome
 
@@ -44,32 +48,39 @@ class: center, middle
 ---
 class: center, middle
 
-# Intro
-
-
-![svg](images/icon-cars-app.png)
+![svg](images/qr-cars.png)
 
 ---
 
 # Why Learn SGD?
 
---
+- SGD an integral building block of deep neural networks 
 
-- SGD is the building block of deep neural networks 
+---
 
---
+# Why Learn SGD?
 
-- SGD is arguably the most important piece of deep neural networks
+"Micrograd is what you need to train neural networks and everything else is just efficiency." - Andrej Karpathy
 
---
+---
 
-- "Micrograd is what you need to train neural networks and everything else is just efficiency" - Andrej Karpathy
+# Why Learn SGD?
 
---
 
 ```elixir
 Axon.Loop.trainer(:mean_squared_error, :sgd)
 ```
+
+---
+
+class: center, middle
+
+![svg](images/struggle.png)
+
+---
+
+![svg](images/nx.png)
+![svg](images/axon.png)
 
 ---
 
@@ -82,6 +93,13 @@ Axon.Loop.trainer(:mean_squared_error, :sgd)
 # Learning From First Principles
 
 ![svg](images/bird.png)
+
+---
+
+# Learning From First Principles
+
+![svg](images/ref-highlight.png)
+
 
 ---
 
@@ -112,9 +130,11 @@ Axon.Loop.trainer(:mean_squared_error, :sgd)
 
 # What does SGD mean?
 
-- SGD is an optimization function that finds the lowest point of a function
+- SGD is an optimization function that eventually finds the lowest point (minumum) of a function
 
 ---
+
+class: center, middle
 
 ## SGD in Action
 
@@ -163,18 +183,6 @@ dy/dx = (2(x+h) - 2x) / h
 
 ---
 
-# SGD Ingredients
-
-## The Derivative
-
-![svg](images/CodeCogsEqn.svg)
-
-### Applied in SGD
-
-- we will use this fundamental rule of calculus to calculate the gradient of a neural network
-
----
-
 # Calculus Ingredients
 
 ## The Chain Rule
@@ -206,7 +214,7 @@ We can take advatage of the chain rule to calculate the gradient of a neural net
   }
 ```
 
-- it's a tree data structure with childred nodes
+- it's a tree data structure with children nodes
 
 ---
 
@@ -220,9 +228,9 @@ We can take advatage of the chain rule to calculate the gradient of a neural net
 a = %Node1{data: 2, label: "a"}
 b = %Node1{data: -3, label: "b"}
 Node1.add(a, b)
-
-# inserts a new Node with data value of -1
 ```
+
+.lg[![png](images/add-graph.png)]
 
 ---
 
@@ -236,15 +244,15 @@ Node1.add(a, b)
 a = %Node1{data: 2, label: "a"}
 b = %Node1{data: -3, label: "b"}
 Node1.mult(a, b)
-
-# inserts a new Node with data value of -6
 ```
+
+.lg[![png](images/multi-graph.png)]
 
 ---
 
 # How is SGD using derivatives?
 
-### Multiplication then Addition, Graphed
+### Multiplication then Addition
 
 ```elixir
 a = %Node1{data: 2, label: "a"}
@@ -263,9 +271,77 @@ d = Node1.mult(a, b, "e") |> Node1.add(c, "d", 1)
 
 ---
 
-# Nx: 
+# How is SGD using derivatives?
+
+- 3 * -3 + 10 = 1
+
+- the data value of the parent node decreased from 4 to 1 which corresponds to the gradient of Node a
+
+.lg[![png](images/grads.png)]
+
+---
+
+# Nx 
 
 ## Numerical Elixir
+
+---
+
+# Nx
+
+## Tensor
+
+### Rank 0 Tensor
+
+- a single scalar number
+
+```elixir
+Nx.tensor([1])
+```
+
+---
+
+# Nx
+
+## Tensor
+
+### Rank 1 Tensor
+
+- a list of numbers
+
+```elixir
+Nx.tensor([1, 2, 3])
+```
+
+---
+
+# Nx
+
+## Tensor
+
+### Rank 2 Tensor
+
+- a table of numbers
+
+```elixir
+Nx.tensor([[1], [2]])
+```
+
+---
+
+# Nx
+
+## Tensor
+
+### Rank 3 Tensor
+
+- a table of tables of numbers
+
+---
+
+# Numerical Function (defn)
+
+- Allows us to compute tensor values faster with JIT compilation on the GPU
 
 ---
 
@@ -275,7 +351,7 @@ d = Node1.mult(a, b, "e") |> Node1.add(c, "d", 1)
 
 # SGD Ingredients
 
-### x and b
+### w and b
 ### Learning Rate
 ### Loss Function
 
@@ -306,11 +382,15 @@ end
 
 # Learning Rate
 
-- a hyperparameter that controls how much to update the w and b parameters
+- a hyperparameter that controls how much to update the w and b activations
 
 ```elixir
-{w - grad_w * @learning_rate,
-b - grad_b * @learning_rate}
+@learning_rate 0.01
+
+{
+  w - grad_w * @learning_rate,
+  b - grad_b * @learning_rate
+}
 ```  
 
 ---
@@ -330,21 +410,18 @@ b - grad_b * @learning_rate}
 # Loss Function
 
 - let's you know how far the prediction is off from the actual value
-
---
-
 - mean squared error is a common loss function
 
 --
 
 ```elixir
-  defn mse(activations, x, y) do
-    y_hat = predict(activations, x)
+defn mse(activations, x, y) do
+  y_hat = predict(activations, x)
 
-    (y - y_hat)
-    |> Nx.pow(2)
-    |> Nx.mean()
-  end
+  (y - y_hat)
+  |> Nx.pow(2)
+  |> Nx.mean()
+end
 ```
 
 ---
@@ -361,11 +438,11 @@ b - grad_b * @learning_rate}
 
 # Update
 
-- process of calculating the gradients and updating the w and b parameters
+- process of calculating the gradients and updating the w and b activations
 
 ```elixir
-  defn update({w, b} = params, x, y) do
-    {grad_w, grad_b} = grad(params, &loss(&1, x, y))
+  defn update({w, b} = activations, x, y) do
+    {grad_w, grad_b} = grad(activations, &mse(&1, x, y))
 
     {
       w - grad_w * @learning_rate,
@@ -409,62 +486,38 @@ b - grad_b * @learning_rate}
 
 ---
 
+# Training - All Together Now
+
 ![png](images/fin.png)
 
 ---
 
-# Axon
+# Training - All Together Now
 
-### A high-level interface for creating neural network models
-
----
-
-# A Neural Network
-
-![png](images/nn.png)
-
----
-
-# Activations
-
-## tanh
-
-![png](images/tanh.png)
-
-- non-linear functions that are applied to the output of the weights + bias
-
----
-
-
-
-# Axon
+## After 5 Epochs
 
 ```elixir
-x1_input = Axon.input("x1", shape: {nil, 1})
-
-model =
-  x1_input
-  |> Axon.dense(4, activation: :relu)
-  |> Axon.dense(1, activation: :tanh)
-
-batch_size = 64
-
-data =
-  Stream.repeatedly(fn ->
-    x = Nx.random_uniform({batch_size, 1}, 0, 50)
-
-    {%{"x1" => x}, Nx.tanh(x)}
-  end)
-
-params =
-  model
-  |> Axon.Loop.trainer(:mean_squared_error, :sgd)
-  |> Axon.Loop.run(data, %{}, epochs: 100, iterations: 1000)
+activations: {1.9050873517990112, 0.6578895449638367}
+activations: {1.9301851987838745, 0.47839775681495667}
+activations: {1.9488297700881958, 0.34842410683631897}
+activations: {1.959909439086914, 0.2548447549343109}
+activations: {1.9717564582824707, 0.1854221224784851}
 ```
 
 ---
 
-# Conclusion
+# Axon
+
+```elixir
+Axon.Loop.trainer(:mean_squared_error, :sgd)
+```
+
+---
+
+# Neural Network
+
+![png](images/nn.png)
+
 
 ---
 
@@ -473,8 +526,12 @@ params =
 - [The spelled-out intro to neural networks and backpropagation: building micrograd](https://www.youtube.com/watch?v=VMj-3S1tku0) -- Andrej Karpathy
 - [fast.ai](https://www.fast.ai/) -- Jeremy Howard
 - [How does a neural net really work?](https://www.kaggle.com/code/jhoward/how-does-a-neural-net-really-work) -- Jeremy Howard
+- [Nx](https://hex.pm/packages/nx)
+- [Axon](https://hex.pm/packages/axon)
+- [Evolve Artist](https://evolveartist.com/)
 - [Up and Running Nx](https://dockyard.com/blog/2021/04/08/up-and-running-nx) -- Dockyard, Sean Moriarity
 - [My LiveBook GH Repo](https://github.com/iacutone/presentations/tree/master/sgd)
+- [My website](https://iacut.one/)
 
 ---
 

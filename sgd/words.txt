@@ -1,69 +1,88 @@
-Hi friends, thank you for joining me this afternoon.
+Hi friends, thank you for joining me this afternoon. Please click on this QR code for a link to a LiveBook which has code implemented as a supplement to my presentation. I created the QR code with DiffusionBee, an OSX program which is used to create pictures based on text input. It also has a feature to upload a photo that can be used a base for training, in this case a QR code.
 
-The title of my presentation is learn gradient descent in 30 minutes. Please click on this QR code for a link to my presentation. I created the QR code with DiffusionBee, an OSX program which allows the user to create pictures based on text input. It also has a feature where you can use a base photo for inspiration, in my case a QR code.
+The title of my presentation is learn stochastic gradient descent (SGD) in under 30 minutes. We will be taking a journey to explore the intricacies of gradient descent through first principles. From this point, I will refer to stochastic gradient descent as SGD which is a common acronym. By the end of this talk, I hope you come away with an intuitive understanding of SGD works.
 
-We will be exploring the intracacies of gradient descent through first principles. From this point, I will refer to stochastic gradient descent as SGD which is a common acronym.
+But before we start, a little introduction about myself. My name is Eric. In my free time, you can typically find me at the park playing with my daughter Giorgina. When I am not playing with my daughter, I spend my time cooking and painting. I also try to stay moderately fit and have developed a weekly running and powerlifting habit. During this conference, I'd be happy to discuss cooking, painting, fitness or toddlers.
 
-But before we start, a little introduction of myself.
+I have been developing web applications for over 10 years. I work at cars.com and write mostly Elixir code. We are hiring. Now let’s dive in!
 
-My name is Eric. I have been developing web applications for around 10 years. I currently write mostly Elixir code at cars.com.
+So why learn how SGD works? SGD is arguably the most important piece of deep neural networks. It is the function that optimizes or allows the network to learn. It’s the main component of constructing a deep neural network. When ChatGPT predicts the next word in a sentence, its weights and biases were optimized with a form of SGD.
 
-In my free time, you can typically find me at the park with my daughter Giorgina. When I am not spending time with my daughter, I enjoy cooking and painting.
+Andrej Karpathy states: “Micrograd is what you need to train neural networks and everything else is just efficiency.” Micrograd is what we will be implementing in Elixir.
 
-Furthermore, I try to stay moderately fit and have developed a weekly running and powerlifting habit. 
+By the end of this talk, you will be able to understand the following line of code.
 
-During this conference, I'd be happy to discuss, cooking, painting, fitness or toddlers
+It took me some time to fully grok SGD. Throughout my learning journey, two classes stand out to me as amazing and completely free resources. Fast.ai by Jeremy Howard and “The spelled-out intro to neural networks and backpropagation: building micrograd” by Andrej Karparthy. These classes, along with a blog post by Sean Moriarty, were the inspiration for both this talk and the supplementary LiveBook code.I have taken all five iterations of the fast.ai course which teaches how to apply deep learning algorithms to real life problems. I learned how to create an image identifier which can identify a grizzly, brown or teddy bears. As a side project, I built an underexposed/overexposed image identifier.
 
-I previously mentioned we would be learning SGD from first principles. I believe people can learn things deeply and clearly from the first principles approach.
+It’s great we have the ability to create neural networks in Elixir nowadays. In the past, I had to relearn Python concepts when I wanted to train a neural network. I don’t use Python often and it takes a while to remember everything. But not anymore! As Elixir devs, we now have all the necessary libraries to apply machine learning including neural networks with Nx and Axon. With these tools we can do fun things like enter Kaggle competitions, apply models from HugginFace or integrate machine learning models into our day jobs.
 
-What do I mean by first principles? I mean that we will take the simplest layer of a problem and continue to add additional complexity on top. This has very strong correlations to our day jobs as software engineers.
+We will be learning SGD from first principles. I believe the curious can learn subjects to a deep understanding from the first principles approach. What do I mean by first principles? I mean that we will take the simplest layer of a problem and continue to add additional complexity on top. This has very strong correlations to our day jobs as software engineers where we break down complex problems into simpler component parts. A personal example of learning from the first principles is when I decided to learn to paint from the Evolve Artist program. At the beginning, I practiced painting solid gray scale blocks.
 
-A personal example of leanring from first principles is when I decided to learn to paint. At the beginning we started by painting solid grey scale blocks.
+With a growing foundational layer, I continually added layers of complexity. After learning from practice to paint solid squares without specs of paint showing through the canvas, the complexity was increased with the addition of gradients which give the illusion of depth and curvature.
 
-With the foundation, we continually add layers of complexity. After you learn to accurately paint solid colors with no specs of canvas, you learn how lights and shadows interact. Then you learn how to paint gradients to give the allution of depth and curvature. The next layer is adding highlights and ??? in order to more accurately render reality.
+The next layer I learned was adding highlights and reflections to portray an even more life-like illusion.
 
-After painting with grey scales for around a year, I graduated onto painting in colors. 
+After practicing somewhat consistently for an extended period of time, another layer of complexity was added, color! Here is a recent painting I completed for class.
 
-Here is a recent paiting I completed for class.
+We will use the first principles approach to understanding SGD. We will start with the basics and slowly build our knowledge from re-implementing part of Karpathy’s micrograd framework with a Node struct in Elixir. This will help us understand how SGD affects gradients in a network. Then, we will use the Elixir Nx library to learn how SGD can solve a linear function.
 
-Let's apply similar principles to SGD and start with the definition. Stochastic is mathematical term which simply means random. Gradient is the slope of a function. And descent means moving downwards. It took me some time to fully understand SGD. Throughout my learning journey, two classes stand out to me as amazing resources. Fast.ai by Jeremy Howard and the micrograd framework by Andrej Karparthy. These classes were the inspiration of the LiveBook code.
+Let’s start with the most basic building block, the definition of SGD. Stochastic is a mathematical term which means randomly determined; having a random probability distribution or pattern that may be analyzed statistically but may not be predicted precisely. Gradient is a rate of inclination; a slope. And descent is an act of moving downwards, dropping, or falling. In short, SGD is an optimization function that eventually finds the local minimum of a given function.
 
-I think this picture aptly describes the action of SGD in a graphical form.
+Let’s look at a gif of SGD in action. Notice how the lines move slowly downward towards the gradients to the local minimum. In essence, SGD is a function that finds the minimum value. This gif aptly depicts SGD in action. SGD optimizes or “learns” to traverse the function until it finds a local minimum.
 
-In essence, SGD is a function to find the minimum of a function.
+The examples in this presentation are accessible from this QR code, it links to a LiveBook. Here is the QR code again if you missed it at the beginning, I’ll keep this up for a few. Next, we will use backpropagation to learn how gradients work. We will construct a Node struct in Elixir via LiveBook which is a translation of the micrograd framework from Python to Elixir. In the second part of this presentation, we will use knowledge we learned about gradients to solve for a linear function using the Nx library. How does that sound!
 
-Now, let's explore the ingredients of SGD in Elixir. The exmaples in this presentation are accessible from the LiveBook.
+Before we dive deeper into SGD, let’s take a moment to review two simple calculus rules, the derivative and the chain rule. Don't be afraid, the math involved is quite simple. This is one way to define a derivative. It tells us a function's sensitivity to change. For example, here is the derivative of the function 2x. After going through the steps defined by the derivative rule, we find the derivative of this function is 2. 
+This means that when the function’s x value is increased by one, the y value doubles. The derivative tells us the function’s sensitivity to change. If I increase the value of x by one the value doubles. One to two, two to four, four to six. We will use the derivative in order to calculate the gradient of a node in the network.
 
-Jeremy Howard quote
+Secondly, we have the chain rule which we will use to determine the relationship between nodes in a tree of nodes. A clear and intuitive example of the chain rule from Wikipedia states "If a car travels twice as fast as a bicycle and the bicycle is four times as fast as a walking man, then the car travels 2 × 4 = 8 times as fast as the man." We have an intermediate relationship, the bicycle, whose relationship to both the car and man we can use to determine the velocities. Both the derivative and chain rule are used in our Node struct to calculate gradients of individual node. The chain rule tells us how changing the value of a child node affects values of nodes further up the tree. Now, let’s build our node struct.
 
-Andrej Karpathy quote
+The Node struct is what we will use to understand SGD. Elixir already has a Node struct which is why it’s defined as Node1 in the LiveBook. The Node struct contains a tree structure whereby a Node struct contains a list of children Node structs. This is a tree data structure. The struct is composed of publicly accessible fields, data, gradient and label. The data field contains the single scalar value. The gradient contains the derivative information. The gradient value is computed from calling the anonymous function stored in _backward. Calling the backprop function will recursively go through all nodes in the tree and compute the gradients. The label is a helper field which is used to graph what the Node tree looks like. The Node struct also contains fields not intended to be interacted with or set from the API including children, backward and op or operation. Again, the backward function contains information necessary to calculate the gradients of each Node in tree when calling backprop. Operation contains what mathematical operation was performed such as addition or multiplication. Children point to the child nodes–the result from the operation of the child nodes produces a parent node with the data value resulting from the operation and data from the child nodes. This might be difficult to understand in words so let’s go through a few examples and slowly build our intuition about how to use the Node API.
 
-The base of building an SGD algorithm is the Node struct. This struct contains a tree structure whereby a Node struct contains a list previous value structs. The struct is composes of publicly accessible fields, data which contains the value of a give node. The operation such as addition or multiplication. A label which is a helper key/value pair which we will use to graph what the Node tree looks like. The Node also contains fields not intended to be interacted with or set from the outside. These fields include an anonymous backward function and a gradient. The backward function information necessary to calculate the gradient of the Node tree when we recurse through the tree.
+This is how you add two nodes. There is a node with the data value of -3 and another node with the value of 2. When these are added together, a new node is inserted into, as a parent, with the data value of -1.
 
+And, this is how you multiply two nodes. There is a node with the data value of -3. And there is another node with the value of 2. When these are multiplied together, a new node is inserted into, as a parent, with the value of -6.
 
-With the Node tree in place, let's explore some simple examples. This is how you add two nodes (EXAMPLE)
+Here is a more complicated example. This is what a node tree looks like if we multiply two nodes -3 and 3 and then add the result to 10, resulting in the data value of 4.
 
-And, this is how you multiply two nodes (EXAMPLE)
+Now that we know how to interact with the Node API and create a Node tree, we can ask interesting questions such as what is the behaviour of the gradient when two nodes are added together? Additionally, what is the behaviour of the gradient when two nodes are multiplied together? When nodes are children of an addition operation, the gradient values flow backward. When nodes are children of a multiplication operation, the gradients of the children are set as the other child node’s data field value multiplied by the parent’s gradient field value. I struggled creating a visual for this but I think these red arrows do a decent job illustrating how the gradient values flow backward. In this example, the gradient from the addition operation flows backward remaining unchanged. Then, for the multiplication operation, the -3 data node’s gradient is calculated by multiplying the other child’s data value of 2 by the parent’s gradient field value of 1. Conversely, the 2 data node’s gradient is calculated by multiplying the other child’s data field value -3 by the parent’s node gradient of 1. This is the chain rule via derivatives in practice.
 
+Now that we understand how gradients are calculated, let's move onto the next building block which is a numerical library in Elixir with the ability to perform mathematical operations similar to the Node struct from above. Nx is crucial to the development of neural networks because it has the ability to efficiently perform linear algebra operations on tensors. You may be asking yourself, what’s a tensor?
 
-This is what a node tree looks like if we multiple two nodes and then add the results together. (EXAMPLE)
+In machine learning land, tensors are lists. A rank 0 tensor is a list with one scalar value. A rank one tensor is a list. A rank two tensor contains a list of lists or a table. A rank 3 tensor a table of table of numbers and resembles a cube. Think of how you would store the values of a color jpeg. There are three squares stacked on top of each other, one for each R, G and B pixel value. The complexities involved with training a neural network come from performing operations efficiently on tensors. The topic of tensors is somewhat outside the scope of this presentation. But the word tensor is extremely common in machine learning and it is good to know that it’s just a list.
 
-In order to calculate gradients, we will need to take a small detour into the world of calculus. But don't be afraid, the math involved is quite simple. This is a definition for a derivative. It's telling the function's sensitivity to change. Since have a Node tree, the gradients of one node will affect other previous nodes in the tree. Using the chain rule, we can determine how changing one node will effect another node in the system. A good and intuitive exmaple from Wikipedia states "If a car travels twice as fast as a bicycle and the bicycle is four times as fast as a walking man, then the car travels 2 × 4 = 8 times as fast as the man."
+Another interesting Nx concept is defn which gives us the ability to run compiled JIT code on your computer’s GPUs. We will use the defn definition later in this presentation and I don’t want to cause confusion.
 
-In terms of the Node struct, questions we need to answer are what does it mean in terms of the gradient when two nodes are added together. The gradients "flow" backward. Additionally, what does it mean when nodes are multiplies together. It means the outcoming node is multiplies by the other incoming node's data value. I think the node graph does a good job exemplifying these ideas. 
+Let’s build on top of Nx to predict the output of a linear function. Here is a graph of the linear function we will use, it is y = 2x. For any input x, the output y will double in value.
 
+Here is a list of SGD ingredients we will need in order to fit our function y = 2x. I will describe what w, b, the loss function and learning rate all do help solve for y = 2x with SGD.
 
-We can now proceed to the next building block of a neural network. For each Node's data value, we will assign a random weight. Here is an example of two data points with their associated weights (EXAMPLE)
+The w and b are both randomly generated numbers. These numbers are also known as activations and are the numbers that are updated when performing SGD. These are the numbers that “learn” and will eventually fit the y = 2x function. We will implement an update function which adjusts the w and b values in the correct direction based on the gradient in respect to the loss function. This is the crux of the learning and I will describe this more in-depth.
 
+The learning rate is a hyperparameter, or something that the machine learning practitioner has the ability to adjust. Let’s set the learning rate to 0.01.
 
-At this point, we can begin to ask some interesting questions such as what is the weight doing, what is the bias doing and what is tanh doing. Our Node struct is modeled after a neuron, an allegory to how the brain's neuron functions. The weights assigned to the data points. In SGD parlance, the weights multiplied by the data are called parameters. The bias is how "trigger happy" our function is firing. Tanh is a function which introduces a non-linearity meaning it squashes the results of the output between -1 and 1 (EXAMPLE). WHY DO WE NEED A non-linearity?
+You don’t want a very small learning rate or the network will take extremely small steps down the gradient and will take a long time to learn. 
 
-Now, let's introduct Nx and Axon. Nx is a numerical library in Elxir allowing as the ability to perform mathematical expressions similar to the Node struct from above. I chose to introduce Nx at the point to focus on how SGD works instead of getting bogged down in the internals of Axon. Axon is a deep learning library built on top of Nx which is similar to PyTorch. Pytorch is a library which allows us to perform differentiation, a way to update the gradient values from out Node struct.
+On the contrary, a very high learning rate can result in a very large step leading to SGD not finding a minimum. The learning rate is heuristic and needs to be fine-tuned.
 
-Bring this back to Ws, Xs and Bs, the job of the SGD algorithm is to find the best W and B values to fit a certain function result or y.
+The loss function is the value we are trying to minimize when performing SGD. Mean square error or MSE is a commonly used loss function, but there are others. 
 
+In this graph we can visualize the mean square error. For example, the blue line indicates the actual result of the function y = 2x. And the blue dot is the predicted result, 2. The actual answer is 4, but our prediction model thinks the answer is two. 
 
+Therefore, the mean square error is 4 minus 2 squared or 4. Our goal is to minimize this mse number. We accomplish this by nudging the gradients in the direction that makes this loss function go down. This is a really important point worth repeating. The activation or w and b values are updated based on the outcome of the prediction.
 
+In order to update the values of w and b, we call the update function. The update function is where the magic happens. It is here where the w and b values are updated with respect to the loss from the prediction. Remember, both w and b are randomly initialized numbers. The gradient is our loss with respect to either w or b and the learning rate is 0.01.
 
+SGD is performed when repeating the update process in a loop. SGD will eventually fit both the w and b values to match y = 2x if the update loop contains a sufficient number of iterations.
 
+Let’s jump into the LiveBook and manually initialize the w and b with random numbers. Then, let’s generate some data that fits our y = 2x function. We call update with the w and b activations and the data. The update function updates the w and b values. Remember, our function is y = 2x and the activations need to perfectly fit out function, the first value should be 2 and the second value, b should be 0. The w and b values are not close to the actual data values because we only ran update one time. 
 
+Instead of manually updating the activations, let’s use a loop to update the w and b values. In order to do this, let’s Stream in activations tuples with accurate x and y values that match y = 2x. The train function will take a list of tuple x and y values and feed them into the update function. We let the train function run for a number of epochs which is how many times we will loop through the data and update w and b. The more epochs, the more accurate the prediction. But accuracy comes at a cost, the more epochs, the slower the training will take. After training for 100 epochs, our model accurately predicts the w and b values.
+
+The training function is slowly nuding the w and b values in the correct direction based on accurate input x and y values. Each loop through the data, the closer w and b are to fitting the function, in this example w should be 2 and b should be 0.
+
+The next step is to design a neural network with Axon, but this is outside the scope of this presentation. The ideas here are transferable to designing a neural network.  You can now confidently understand setting these values when designing your neural network with Axon. 
+
+The central idea to transfer is every Node in a neural network will have a w and b value. Instead of only updating a single w and b, a neural network updates all weights and biases in order to train. The green and blue circles in this chart will all have weights and biases associated with them. It’s the same concept as we discussed with Nx, just with more layers. It behaves the same, where the w and b numbers are slowly nudged in the correct direction based on gradient data.
+
+By throwing my feet in the fire, I learned SGD at a deep level by taking a first principles approach. In the process, I leveled up my recursion and Elixir data manipulation skills. Additionally, I learned how difficult it is to teach a subject and give a presentation. I admire anyone with the ability to teach well, especially Jeremy Howard and Andrej Karpathy.
